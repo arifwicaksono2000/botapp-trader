@@ -1,0 +1,13 @@
+requests
+fastapi
+uvicorn
+ctrader-open-api
+service_identity
+sqlalchemy
+aiomysql
+greenlet
+python-dotenv
+flask
+mysql-connector-python
+channels
+channels-redis

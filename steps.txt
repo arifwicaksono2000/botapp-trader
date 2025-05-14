@@ -1,0 +1,91 @@
+# STEP TO RUN PROGRAMS
+
+## CREATE VIRTUAL MACHINE
+
+1. python3 -m venv trenv ==> mac
+2. py -3.11 -m venv trenv ==> windows
+3. py -0p => to get all python list in windows
+
+(Optional to install specific version) MAC
+
+1. brew install python@3.11
+2. ls -l /opt/homebrew/opt/python@3.11/bin/python3.11
+3. /opt/homebrew/opt/python@3.11/bin/python3.11 -m venv trenv ==> mac
+
+## TURN ON VIRTUAL MACHINE
+
+1. Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope Process
+2. trenv\Scripts\activate => this is for windows
+3. source trenv/bin/activate => this is for mac
+
+## INSTALL LIBRARY
+
+1. pip install -r requirements.txt
+
+## RUN APP
+
+1. python .\setup\get_ctrader_token.py => get initial tokens
+2. python .\setup\get_ctrader_refresh.py => get refresh tokens // If idle for a long time, you have to re-get initial token
+3. python main.py
+4. uvicorn main:app --reload
+
+access token: sdWA3tjzbzsdZgelRBNk3vJvjx5rfFtFsigaVBxPyFQ
+
+## TURN OFF UVICRON
+
+1. Ctrl + C
+2. taskkill /f /im python.exe => if no.1 doesn't work
+
+## TURN OFF VIRTUAL MACHINE
+
+1. deactivate
+
+##### RUN THE APP
+
+1. python main.py
+2. login 42825116
+3. reconcile 42825116 ==> get account detail
+4. ProtoOASymbolsListReq False ==> get symbols
+5. NewMarketOrder *1 *BUY *1000 order-buy-eurusd ==> open market order on long
+6. ClosePosition *499942987 *1000 close-eurusd-1lot
+
+login 42610743
+reconcile 42610743
+✅ Available accounts from token:
+🔹 42869244
+🔹 42825116 ← THIS ONE ACTIVE BALANCE
+🔹 42596960
+🔹 42610743 ← THIS ONE DEMO
+
+Command (ex help): ProtoOAGetAccountListByAccessTokenReq
+Message received:
+accessToken: "1V7oj0Qyi5uAdhbHita7qAJmMDMkaMKHueBV5PNNNJ0"
+permissionScope: SCOPE_TRADE
+ctidTraderAccount {
+ctidTraderAccountId: 42869244
+isLive: true
+traderLogin: 6059242
+lastClosingDealTimestamp: 1742415759532
+lastBalanceUpdateTimestamp: 1743220778323
+}
+ctidTraderAccount {
+ctidTraderAccountId: 42825116
+isLive: true
+traderLogin: 6058377
+lastClosingDealTimestamp: 1742058679443
+lastBalanceUpdateTimestamp: 1743220783010
+}
+ctidTraderAccount {
+ctidTraderAccountId: 42596960
+isLive: true
+traderLogin: 6054101
+lastClosingDealTimestamp: 1741457086684
+lastBalanceUpdateTimestamp: 1741457086684
+}
+ctidTraderAccount {
+ctidTraderAccountId: 42610743
+isLive: false
+traderLogin: 9363397
+lastClosingDealTimestamp: 1741457316823
+lastBalanceUpdateTimestamp: 1741457316823
+}
