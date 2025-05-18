@@ -63,20 +63,6 @@ Base = declarative_base(metadata=MetaData())
 # -----------------------------------------------------------------------------
 # Database models
 # -----------------------------------------------------------------------------
-class DealLog(Base):
-    __tablename__ = "deal_logs"
-    id = Column(Integer, primary_key=True)
-    position_id = Column(BigInteger)
-    order_id = Column(BigInteger)
-    deal_id = Column(BigInteger)
-    side = Column(Integer)  # 1 = buy, 2 = sell
-    volume = Column(BigInteger)
-    price = Column(Float)
-    commission = Column(Float)
-    swap = Column(Float)
-    used_margin = Column(Float)
-    execution_type = Column(Integer)  # 2 = order_filled, 3 = order_closed
-    timestamp = Column(DateTime, default=dt.datetime.utcnow)
 
 class TokenDB(Base):
     __tablename__ = "botcore_token"
