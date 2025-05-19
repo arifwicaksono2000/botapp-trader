@@ -12,6 +12,7 @@ class SimpleBot:
         self.volume = volume * 100
         self.hold = hold
         self.open_position_id = None
+        self.positions: dict[int, dict] = {}
         
         register_callbacks(self)
 
@@ -19,3 +20,9 @@ class SimpleBot:
         self.client.startService()
         from twisted.internet import reactor
         reactor.run()
+    
+    # def print_positions(self):
+    #     print("[POSITIONS]")
+    #     for pos_id, data in self.positions.items():
+    #         print(f" - ID {pos_id}: Sym={data['symbolId']}, Vol={data['volume']}, "
+    #             f"PnL={data['unrealisedNetProfit']:.2f}, Margin={data['usedMargin']}")

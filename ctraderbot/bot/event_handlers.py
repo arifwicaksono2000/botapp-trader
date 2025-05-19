@@ -10,6 +10,7 @@ from .auth import after_app_auth, after_account_auth
 from .execution import handle_execution
 from .trading import on_position_update
 from ..settings import CLIENT_ID, CLIENT_SECRET
+import datetime as dt
 
 def register_callbacks(bot):
     bot.client.setConnectedCallback(lambda _: on_connected(bot))
@@ -47,3 +48,19 @@ def on_message(bot, msg):
             reactor.stop()
     else:
         print(MessageToDict(Protobuf.extract(msg)))
+
+def on_position_update(bot, update):
+    for pos in update.position:
+        pos_id = pos.positionId
+        bot.positions[pos_id] = {
+            "symbolId": pos.symbolId,
+            "volume": pos.volume,
+            "unrealisedNetProfit": pos.unrealisedNetProfit,
+            "usedMargin": pos.usedMargin,
+            "swap": pos.swap,
+            "timestamp": dt.datetime.utcnow().isoformat()
+        }
+        print(
+            f"[TRACK] Pos {pos_id} | Sym {pos.symbolId} | Vol {pos.volume} | "
+            f"PnL {pos.unrealisedNetProfit:.2f} | Margin {pos.usedMargin}"
+        )
