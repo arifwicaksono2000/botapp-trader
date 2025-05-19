@@ -1,4 +1,7 @@
 # event_handlers.py
+import httpx
+import asyncio
+
 from ctrader_open_api.messages.OpenApiMessages_pb2 import *
 from ctrader_open_api.messages.OpenApiCommonMessages_pb2 import *       # noqa: F403,E402
 from ctrader_open_api.messages.OpenApiModelMessages_pb2 import *       # noqa: F403,E402
@@ -11,6 +14,8 @@ from .execution import handle_execution
 from .trading import on_position_update
 from ..settings import CLIENT_ID, CLIENT_SECRET
 import datetime as dt
+from asgiref.sync import async_to_sync
+from channels.layers import get_channel_layer
 
 def register_callbacks(bot):
     bot.client.setConnectedCallback(lambda _: on_connected(bot))
@@ -27,6 +32,11 @@ def on_disconnected(reason):
     if reactor.running:
         reactor.stop()
 
+async def broadcast_position_update(data):
+    async with httpx.AsyncClient() as client:
+        await client.post("http://localhost:9000/broadcast", json=data)
+
+
 def on_message(bot, msg):
     pt = msg.payloadType
     print(f"[debug] Incoming payloadType = {pt}")
@@ -42,6 +52,35 @@ def on_message(bot, msg):
     elif pt == ProtoOAReconcileRes().payloadType:
         print("[✓] Reconcile complete. Exiting…")
         reactor.stop()
+    elif pt == ProtoOASpotEvent().payloadType:
+        spot = Protobuf.extract(msg)
+        # bot.latest_price = (spot.ask + spot.bid) / 2  # midpoint price
+        ask = spot.ask / 100000.0
+        bid = spot.bid / 100000.0
+        bot.latest_price = (ask + bid) / 2
+        # Recalculate PnL for each open position
+        for pid, p in bot.positions.items():
+            if p["status"] == "OPEN":
+                entry = p["entry_price"]
+                volume = p["volume"]
+                diff = bot.latest_price - entry
+                pnl = (diff * volume / 100000)
+
+                data = {
+                    "positionId": pid,
+                    "symbolId": p["symbolId"],
+                    "volume": volume,
+                    "entry_price": entry,
+                    "price": bot.latest_price,
+                    "unrealisedPnL": round(pnl, 2),
+                    "status": p["status"],
+                }
+
+                print(data)
+
+                asyncio.create_task(broadcast_position_update(data))
+
+
     elif pt in {ProtoOAOrderErrorEvent().payloadType, ProtoOAErrorRes().payloadType}:
         print("[✖] Server error:", MessageToDict(Protobuf.extract(msg)))
         if reactor.running:

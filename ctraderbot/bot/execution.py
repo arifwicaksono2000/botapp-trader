@@ -9,22 +9,42 @@ from .trading import close_position, reconcile
 
 def handle_execution(bot, ev):
     print("[✓] Execution Event:")
+    if not ev.HasField("position"):
+        print("No position in event.")
+        return
     print(f"  executionType: {ev.executionType}")
     deal, order, pos = ev.deal, ev.order, ev.position
 
-    data = {
-        "deal_id": deal.dealId,
-        "position_id": pos.positionId,
-        "order_id": order.orderId,
-        "side": order.tradeData.tradeSide,
-        "volume": deal.volume,
-        "price": deal.executionPrice,
-        "commission": deal.commission,
-        "swap": pos.swap,
+    pos = ev.position
+    pid = pos.positionId
+    entry = pos.price / 100000.0
+
+    bot.positions[pid] = {
+        "symbolId": pos.tradeData.symbolId,
+        "volume": pos.tradeData.volume,
+        "entry_price": entry,
         "used_margin": pos.usedMargin,
-        "execution_type": ev.executionType,
-        "timestamp": dt.datetime.utcnow(),
+        "swap": pos.swap,
+        "timestamp": dt.datetime.utcnow().isoformat(),
+        "status": "OPEN" if pos.positionStatus == 1 else "CLOSED",
     }
+
+    # data = {
+    #     "deal_id": deal.dealId,
+    #     "position_id": pos.positionId,
+    #     "order_id": order.orderId,
+    #     "side": order.tradeData.tradeSide,
+    #     "volume": deal.volume,
+    #     "price": deal.executionPrice,
+    #     "commission": deal.commission,
+    #     "swap": pos.swap,
+    #     "used_margin": pos.usedMargin,
+    #     "execution_type": ev.executionType,
+    #     "timestamp": dt.datetime.utcnow(),
+    # }
+
+    print(f"[TRACK] Pos {pid} | Sym {pos.tradeData.symbolId} | Vol {pos.tradeData.volume} | "
+        f"Entry={entry} | Margin={pos.usedMargin} | Status={bot.positions[pid]['status']}")
 
     # ensureDeferred(insert_deal(data))
 

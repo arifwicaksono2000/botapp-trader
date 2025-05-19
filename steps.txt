@@ -24,9 +24,10 @@
 
 ## RUN APP
 
-1. python -m ctraderbot.cli --side buy --volume 1000 --hold 60
-1. python .\setup\get_ctrader_token.py => get initial tokens
-2. python .\setup\get_ctrader_refresh.py => get refresh tokens // If idle for a long time, you have to re-get initial token
+1. uvicorn ctraderbot.websocket.server:app --host 0.0.0.0 --port 9000 --reload  ==> run for websocket
+2. python -m ctraderbot.cli --side buy --volume 1000 --hold 60 ==> run for trade bot
+3. python .\setup\get_ctrader_token.py => get initial tokens
+4. python .\setup\get_ctrader_refresh.py => get refresh tokens // If idle for a long time, you have to re-get initial token
 
 ## IF ENV DOESN'T WORK
 1. remove the bugged variable using | example=> Remove-Item Env:MYSQL_URL 

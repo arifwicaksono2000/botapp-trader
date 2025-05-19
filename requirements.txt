@@ -11,3 +11,5 @@ flask
 mysql-connector-python
 channels
 channels-redis
+httpx
+websockets

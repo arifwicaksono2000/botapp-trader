@@ -13,6 +13,7 @@ class SimpleBot:
         self.hold = hold
         self.open_position_id = None
         self.positions: dict[int, dict] = {}
+        self.latest_price: float = 0.0  # latest bid/ask midpoint
         
         register_callbacks(self)
 
