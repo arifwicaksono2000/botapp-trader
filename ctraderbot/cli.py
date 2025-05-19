@@ -24,7 +24,7 @@ from ctrader_open_api import Client, TcpProtocol
 from .database import engine, Base
 from .helpers import fetch_access_token
 from .settings import HOST, PORT, ACCOUNT_ID, SYMBOL_ID
-from .bot import SimpleBot
+from .bot.simple_bot import SimpleBot
 
 
 def build_parser():
@@ -52,6 +52,7 @@ def main():
 
 
     # Start the bot
+    print(ACCOUNT_ID, HOST)
     client = Client(HOST, PORT, TcpProtocol)
     bot = SimpleBot(client, token, ACCOUNT_ID, SYMBOL_ID,
                     args.side, args.volume, args.hold)

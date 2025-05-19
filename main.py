@@ -187,11 +187,11 @@ class SimpleBot:
             self._send_market_order()
             return
         
-        if pt == ProtoOAPositionUpdateEvent().payloadType:
-            position_update = Protobuf.extract(msg)
-            for pos in position_update.position:
-                # Log the real-time unrealized PnL
-                print(f"[PnL Update] Symbol {pos.symbolId} | Position ID {pos.positionId} | Unrealized PnL: {pos.unrealisedNetProfit:.2f}")
+        # if pt == ProtoOAPositionUpdateEvent().payloadType:
+        #     position_update = Protobuf.extract(msg)
+        #     for pos in position_update.position:
+        #         # Log the real-time unrealized PnL
+        #         print(f"[PnL Update] Symbol {pos.symbolId} | Position ID {pos.positionId} | Unrealized PnL: {pos.unrealisedNetProfit:.2f}")
 
 
         if pt == ProtoOAExecutionEvent().payloadType:

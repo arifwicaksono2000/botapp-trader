@@ -24,12 +24,13 @@
 
 ## RUN APP
 
+1. python -m ctraderbot.cli --side buy --volume 1000 --hold 60
 1. python .\setup\get_ctrader_token.py => get initial tokens
 2. python .\setup\get_ctrader_refresh.py => get refresh tokens // If idle for a long time, you have to re-get initial token
-3. python main.py
-4. uvicorn main:app --reload
 
-access token: sdWA3tjzbzsdZgelRBNk3vJvjx5rfFtFsigaVBxPyFQ
+## IF ENV DOESN'T WORK
+1. remove the bugged variable using | example=> Remove-Item Env:MYSQL_URL 
+1. turn off and on virtual machine
 
 ## TURN OFF UVICRON
 
@@ -40,52 +41,8 @@ access token: sdWA3tjzbzsdZgelRBNk3vJvjx5rfFtFsigaVBxPyFQ
 
 1. deactivate
 
-##### RUN THE APP
-
-1. python main.py
-2. login 42825116
-3. reconcile 42825116 ==> get account detail
-4. ProtoOASymbolsListReq False ==> get symbols
-5. NewMarketOrder *1 *BUY *1000 order-buy-eurusd ==> open market order on long
-6. ClosePosition *499942987 *1000 close-eurusd-1lot
-
-login 42610743
-reconcile 42610743
 ✅ Available accounts from token:
 🔹 42869244
 🔹 42825116 ← THIS ONE ACTIVE BALANCE
 🔹 42596960
 🔹 42610743 ← THIS ONE DEMO
-
-Command (ex help): ProtoOAGetAccountListByAccessTokenReq
-Message received:
-accessToken: "1V7oj0Qyi5uAdhbHita7qAJmMDMkaMKHueBV5PNNNJ0"
-permissionScope: SCOPE_TRADE
-ctidTraderAccount {
-ctidTraderAccountId: 42869244
-isLive: true
-traderLogin: 6059242
-lastClosingDealTimestamp: 1742415759532
-lastBalanceUpdateTimestamp: 1743220778323
-}
-ctidTraderAccount {
-ctidTraderAccountId: 42825116
-isLive: true
-traderLogin: 6058377
-lastClosingDealTimestamp: 1742058679443
-lastBalanceUpdateTimestamp: 1743220783010
-}
-ctidTraderAccount {
-ctidTraderAccountId: 42596960
-isLive: true
-traderLogin: 6054101
-lastClosingDealTimestamp: 1741457086684
-lastBalanceUpdateTimestamp: 1741457086684
-}
-ctidTraderAccount {
-ctidTraderAccountId: 42610743
-isLive: false
-traderLogin: 9363397
-lastClosingDealTimestamp: 1741457316823
-lastBalanceUpdateTimestamp: 1741457316823
-}

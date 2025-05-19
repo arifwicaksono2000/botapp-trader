@@ -1,2 +1,4 @@
 .env
 trenv
+ctraderbot/__pycache__
+ctraderbot/bot/__pycache__
