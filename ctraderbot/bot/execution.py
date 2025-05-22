@@ -25,7 +25,7 @@ def handle_execution(bot, ev):
         "entry_price": entry,
         "used_margin": pos.usedMargin,
         "swap": pos.swap,
-        "timestamp": dt.datetime.datetime.now(dt.timezone.utc).isoformat(),
+        "timestamp": dt.datetime.now(dt.timezone.utc).isoformat(),
         "status": "OPEN" if pos.positionStatus == 1 else "CLOSED",
     }
 
