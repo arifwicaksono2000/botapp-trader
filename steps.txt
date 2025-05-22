@@ -42,6 +42,11 @@
 
 1. deactivate
 
+## Setup for .Env
+
+1. echo $Env:CTRADER_SYMBOL_ID
+2. Remove-Item Env:CTRADER_ACCOUNT
+
 ✅ Available accounts from token:
 🔹 42869244
 🔹 42825116 ← THIS ONE ACTIVE BALANCE

@@ -29,9 +29,3 @@ def close_position(bot):
 
 def reconcile(bot):
     bot.client.send(ProtoOAReconcileReq(ctidTraderAccountId=bot.account_id))
-
-def on_position_update(bot, update):
-    for pos in update.position:
-        print(
-            f"[PnL] Pos {pos.positionId} | Sym {pos.symbolId} | Unrealized {pos.unrealisedNetProfit:.2f}"
-        )
