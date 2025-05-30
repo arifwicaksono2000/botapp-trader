@@ -24,6 +24,8 @@
 
 ## RUN APP
 
+** YOU NEED TO RUN ALL APP SIMULTANEOUSLY, OTHERWISE IT WILL OUPUTS ERRORS
+
 1. uvicorn ctraderbot.websocket.server:app --host 0.0.0.0 --port 9000 --reload  ==> run for websocket
 2. python -m ctraderbot.cli --side buy --volume 1000 --hold 60 ==> run for trade bot
 3. python .\setup\get_ctrader_token.py => get initial tokens

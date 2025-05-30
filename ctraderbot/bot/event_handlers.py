@@ -53,32 +53,47 @@ def on_message(bot, msg):
         reactor.stop()
     elif pt == ProtoOASpotEvent().payloadType:
         spot = Protobuf.extract(msg)
-        # bot.latest_price = (spot.ask + spot.bid) / 2  # midpoint price
-        ask = spot.ask / 100000.0
-        bid = spot.bid / 100000.0
-        bot.latest_price = (ask + bid) / 2
-        # Recalculate PnL for each open position
+
+        # 1) Update last-known ask/bid (divide by 100_000 to get actual price)
+        if spot.ask > 0:
+            bot.last_ask = spot.ask / 100000.0
+        if spot.bid > 0:
+            bot.last_bid = spot.bid / 100000.0
+
+        # 2) Only compute midpoint when you have both
+        if bot.last_ask and bot.last_bid:
+            bot.latest_price = (bot.last_ask + bot.last_bid) / 2
+        else:
+            print("[!] Missing ask or bid price, cannot compute latest price.")
+            return   # or `continue` the surrounding loop so you skip PnL
+
+        # 3) Recalculate PnL for each open position
         for pid, p in bot.positions.items():
-            if p["status"] == "OPEN":
-                entry = p["entry_price"]
-                volume = p["volume"]
-                diff = bot.latest_price - entry
-                pnl = (diff * volume / 100000)
+            print(f"Entry Price: {p['entry_price']}")
+            if p["status"] != "OPEN":
+                continue
 
-                data = {
-                    "positionId": pid,
-                    "symbolId": p["symbolId"],
-                    "volume": volume,
-                    "entry_price": entry,
-                    "price": bot.latest_price,
-                    "unrealisedPnL": round(pnl, 2),
-                    "status": p["status"],
-                }
+            # convert entry price and volume
+            entry = p["entry_price"]
+            lots  = p["volume"]      / (100000 * 100) # p volume is 100.000
 
-                print(data)
+            pip_diff = (bot.latest_price - entry)
+            # pip_value = 10  # for 1 lot
+            pnl = pip_diff * p["volume"] * 0.01
 
-                asyncio.create_task(broadcast_position_update(data))
+            data = {
+                "positionId":   pid,
+                "symbolId":     p["symbolId"],
+                "Lot":       lots,
+                "entry_price": round(entry, 5),
+                "price": round(bot.latest_price, 5),
+                "unrealisedPnL": f"{round(pnl, 2):.2f}",  # Force two decimals
+                # "unrealisedPnL": round(pnl, 2),
+                "status":       p["status"],
+            }
 
+            print(data)
+            asyncio.create_task(broadcast_position_update(data))
 
     elif pt in {ProtoOAOrderErrorEvent().payloadType, ProtoOAErrorRes().payloadType}:
         print("[✖] Server error:", MessageToDict(Protobuf.extract(msg)))

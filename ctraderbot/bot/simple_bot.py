@@ -10,6 +10,7 @@ class SimpleBot:
         self.symbol_id = symbol_id
         self.trade_side = side.upper()
         self.volume = volume * 100
+        # self.volume = volume * 100
         self.hold = hold
         self.open_position_id = None
         self.positions: dict[int, dict] = {}

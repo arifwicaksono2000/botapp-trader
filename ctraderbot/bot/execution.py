@@ -17,7 +17,8 @@ def handle_execution(bot, ev):
 
     pos = ev.position
     pid = pos.positionId
-    entry = pos.price / 100000.0
+    entry = pos.price
+    # entry = pos.price / 100000.0
 
     bot.positions[pid] = {
         "symbolId": pos.tradeData.symbolId,
