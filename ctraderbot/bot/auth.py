@@ -16,5 +16,4 @@ def after_account_auth(bot):
         symbolId=[bot.symbol_id],
         subscribeToSpotTimestamp=True,
     ))
-
     send_market_order(bot)   # ✅ call instance method

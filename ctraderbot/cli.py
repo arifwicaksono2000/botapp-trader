@@ -29,7 +29,7 @@ from .bot.simple_bot import SimpleBot
 
 def build_parser():
     parser = argparse.ArgumentParser(description="Async cTrader bot CLI")
-    parser.add_argument("--side", choices=["buy", "sell"], required=True)
+    # parser.add_argument("--side", choices=["buy", "sell"], required=True)
     parser.add_argument("--volume", type=int, default=1000, help="Volume in micro-lots")
     parser.add_argument("--hold", type=int, default=60, help="Hold duration in seconds")
     return parser
@@ -54,8 +54,8 @@ def main():
     # Start the bot
     print(ACCOUNT_ID, HOST)
     client = Client(HOST, PORT, TcpProtocol)
-    bot = SimpleBot(client, token, ACCOUNT_ID, SYMBOL_ID,
-                    args.side, args.volume, args.hold)
+    bot = SimpleBot(client, token, ACCOUNT_ID, SYMBOL_ID, args.volume, args.hold)
+    # bot = SimpleBot(client, token, ACCOUNT_ID, SYMBOL_ID, args.side, args.volume, args.hold)
     print("[DEBUG] Bot initialized, starting reactor...")
     bot.start()
 
