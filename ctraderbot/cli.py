@@ -52,7 +52,7 @@ def main():
 
 
     # Start the bot
-    print(ACCOUNT_ID, HOST)
+    # print(ACCOUNT_ID, HOST)
     client = Client(HOST, PORT, TcpProtocol)
     bot = SimpleBot(client, token, ACCOUNT_ID, SYMBOL_ID, args.volume, args.hold)
     # bot = SimpleBot(client, token, ACCOUNT_ID, SYMBOL_ID, args.side, args.volume, args.hold)

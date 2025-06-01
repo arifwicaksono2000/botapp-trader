@@ -11,9 +11,6 @@ from .auth import after_app_auth, after_account_auth
 from .execution import handle_execution
 from .spot_event import handle_spot_event
 from ..settings import CLIENT_ID, CLIENT_SECRET
-import datetime as dt
-from asgiref.sync import async_to_sync
-from channels.layers import get_channel_layer
 
 def register_callbacks(bot):
     bot.client.setConnectedCallback(lambda _: on_connected(bot))

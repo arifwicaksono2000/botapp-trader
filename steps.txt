@@ -31,6 +31,12 @@
 3. python .\setup\get_ctrader_token.py => get initial tokens
 4. python .\setup\get_ctrader_refresh.py => get refresh tokens // If idle for a long time, you have to re-get initial token
 
+## RUN SIMULATION
+
+1. python -c "from ctraderbot.simulate.simple_bot import SimpleBot; 
+bot = SimpleBot(client_id='X', client_secret='Y', symbol_id=1, account_id='Z', volume=100000);
+bot.simulate_trade_cycle()"
+
 ## IF ENV DOESN'T WORK
 1. remove the bugged variable using | example=> Remove-Item Env:MYSQL_URL 
 1. turn off and on virtual machine

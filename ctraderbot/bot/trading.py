@@ -14,14 +14,14 @@ def send_market_order(bot):
     )
     bot.client.send(req)
 
-    # req = ProtoOANewOrderReq(
-    #     ctidTraderAccountId=bot.account_id,
-    #     symbolId=bot.symbol_id,
-    #     orderType=ProtoOAOrderType.MARKET,
-    #     tradeSide=ProtoOATradeSide.Value("SELL"),
-    #     volume=bot.volume,
-    # )
-    # bot.client.send(req)
+    req = ProtoOANewOrderReq(
+        ctidTraderAccountId=bot.account_id,
+        symbolId=bot.symbol_id,
+        orderType=ProtoOAOrderType.MARKET,
+        tradeSide=ProtoOATradeSide.Value("SELL"),
+        volume=bot.volume,
+    )
+    bot.client.send(req)
 
 def close_position(bot):
     if bot.open_position_id is None:
