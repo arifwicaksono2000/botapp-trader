@@ -6,55 +6,81 @@ from ctrader_open_api.messages.OpenApiCommonMessages_pb2 import *       # noqa: 
 from ctrader_open_api.messages.OpenApiModelMessages_pb2 import *       # noqa: F403,E402
 from ..helpers import insert_deal
 from .trading import close_position, reconcile
+from twisted.internet import reactor
+from functools import partial
 
 def handle_execution(bot, ev):
     print("[✓] Execution Event:")
     if not ev.HasField("position"):
         print("No position in event.")
         return
-    print(f"  executionType: {ev.executionType}")
-    deal, order, pos = ev.deal, ev.order, ev.position
 
+    order = ev.order
     pos = ev.position
     pid = pos.positionId
-    entry = pos.price
-    # entry = pos.price / 100000.0
+    coid = order.clientOrderId or ""
+    side = order.tradeData.tradeSide         # 1 = BUY, 2 = SELL
+    entry_price = pos.price
+    used_margin = pos.usedMargin
+    status_str = "OPEN" if pos.positionStatus == 1 else "CLOSED"
 
+    # Record/update the position
     bot.positions[pid] = {
         "symbolId": pos.tradeData.symbolId,
         "volume": pos.tradeData.volume,
-        "entry_price": entry,
-        "used_margin": pos.usedMargin,
+        "entry_price": entry_price,
+        "used_margin": used_margin,
         "swap": pos.swap,
         "timestamp": dt.datetime.now(dt.timezone.utc).isoformat(),
-        "status": "OPEN" if pos.positionStatus == 1 else "CLOSED",
+        "status": status_str,
+        "side": side,
+        "clientOrderId": coid
     }
 
-    # data = {
-    #     "deal_id": deal.dealId,
-    #     "position_id": pos.positionId,
-    #     "order_id": order.orderId,
-    #     "side": order.tradeData.tradeSide,
-    #     "volume": deal.volume,
-    #     "price": deal.executionPrice,
-    #     "commission": deal.commission,
-    #     "swap": pos.swap,
-    #     "used_margin": pos.usedMargin,
-    #     "execution_type": ev.executionType,
-    #     "timestamp": dt.datetime.utcnow(),
-    # }
+    print(f"[TRACK] Pos {pid} | Side={ 'BUY' if side==1 else 'SELL' } "
+          f"| Vol {pos.tradeData.volume} | Entry={entry_price} | "
+          f"Margin={used_margin} | Status={status_str} | coid={coid}")
 
-    print(f"[TRACK] Pos {pid} | Sym {pos.tradeData.symbolId} | Vol {pos.tradeData.volume} | "
-        f"Entry={entry} | Margin={pos.usedMargin} | Status={bot.positions[pid]['status']}")
-
-    # ensureDeferred(insert_deal(data))
-
+    # Only schedule or handle closes on ORDER_FILLED
     if ev.executionType == ProtoOAExecutionType.ORDER_FILLED:
-        if bot.open_position_id is None:  # first fill (open)
-            bot.open_position_id = pos.positionId
-            print(f"[→] Position opened {bot.open_position_id}. Hold {bot.hold}s…")
-            from twisted.internet import reactor
-            reactor.callLater(bot.hold, close_position, bot)
-        else:  # second fill (close)
-            print(f"[✓] Position {bot.open_position_id} closed.")
-            reconcile(bot)
+
+        # ─── OPEN LONG ─────────────────────────────────────────────────────────
+        if coid == "OPEN_LONG_1":
+            bot.open_long_id = pid
+            print(f"[→] Long‐opened {pid}. Hold {bot.hold}s…")
+            reactor.callLater(bot.hold, close_position, bot, pid)
+
+        # ─── OPEN SHORT ────────────────────────────────────────────────────────
+        elif coid == "OPEN_SHORT_2":
+            bot.open_short_id = pid
+            print(f"[→] Short‐opened {pid}. Hold {bot.hold}s…")
+            reactor.callLater(bot.hold, close_position, bot, pid)
+
+        # ─── CLOSE LONG ─────────────────────────────────────────────────────────
+        elif coid == "CLOSE_LONG_1":
+            print(f"[✓] Closed Long {pid} by tag {coid}")
+            bot.positions[pid]["status"] = "CLOSED"
+
+            # If the short side is already closed, reconcile now
+            short_id = getattr(bot, "open_short_id", None)
+            if short_id and bot.positions.get(short_id, {}).get("status") == "CLOSED":
+                print("[→] Both sides closed → reconciling now…")
+                reconcile(bot)
+
+        # ─── CLOSE SHORT ────────────────────────────────────────────────────────
+        elif coid == "CLOSE_SHORT_2":
+            print(f"[✓] Closed Short {pid} by tag {coid}")
+            bot.positions[pid]["status"] = "CLOSED"
+
+            # If the long side is already closed, reconcile now
+            long_id = getattr(bot, "open_long_id", None)
+            if long_id and bot.positions.get(long_id, {}).get("status") == "CLOSED":
+                print("[→] Both sides closed → reconciling now…")
+                reconcile(bot)
+
+
+def close_all_positions(bot):
+    """Close every open position we know about."""
+    for position_id, info in list(bot.positions.items()):
+        if info["status"] == "OPEN":
+            close_position(bot, position_id)
