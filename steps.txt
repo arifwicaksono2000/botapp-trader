@@ -55,6 +55,10 @@ bot.simulate_trade_cycle()"
 1. echo $Env:CTRADER_SYMBOL_ID
 2. Remove-Item Env:CTRADER_ACCOUNT
 
+## List of Subaccounts:
+
+1. ProtoOAGetAccountListByAccessTokenReq
+
 ✅ Available accounts from token:
 🔹 42869244
 🔹 42825116 ← THIS ONE ACTIVE BALANCE

@@ -46,10 +46,10 @@ def _build_pnl_payload(bot, pid: int, pos: dict) -> dict:
     return {
         "positionId":    pid,
         "symbolId":      pos["symbolId"],
-        "Lot":           units / 100_000.0,
+        "lot":           units / 100_000.0,
         "entry_price":   round(entry, 5),
         "price":         round(current, 5),
-        "unrealisedPnL": f"{pnl_usd:.2f}",
+        "unrealisedPnL": round(pnl_usd, 2),
         "status":        pos["status"],
     }
 

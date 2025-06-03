@@ -22,7 +22,7 @@ async def fetch_access_token() -> str:
         return row[0]
     
 
-async def fetch_main_account() -> str:
+async def fetch_main_account() -> int:
     """Return the *main* account from DB or raise."""
     async with Session() as s:
         result = await s.execute(
