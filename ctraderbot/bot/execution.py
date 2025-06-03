@@ -4,7 +4,7 @@ from twisted.internet.defer import ensureDeferred
 from ctrader_open_api.messages.OpenApiMessages_pb2 import *
 from ctrader_open_api.messages.OpenApiCommonMessages_pb2 import *       # noqa: F403,E402
 from ctrader_open_api.messages.OpenApiModelMessages_pb2 import *       # noqa: F403,E402
-from ..helpers import insert_deal
+# from ..helpers import insert_deal
 from .trading import close_position, reconcile
 from twisted.internet import reactor
 from functools import partial

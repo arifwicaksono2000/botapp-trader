@@ -4,7 +4,7 @@ from __future__ import annotations
 from sqlalchemy import select, desc
 
 from .database import Session
-from .models import TokenDB, DealLog
+from .models import TokenDB, Subaccount
 
 
 async def fetch_access_token() -> str:
@@ -20,13 +20,27 @@ async def fetch_access_token() -> str:
         if not row:
             raise RuntimeError("No valid access token found in DB")
         return row[0]
+    
 
-
-async def insert_deal(data: dict):
-    """Insert deal log – silently ignore unknown keys to keep compatibility."""
-    valid_cols = {c.name for c in DealLog.__table__.columns}  # type: ignore[attr-defined]
-    filtered = {k: v for k, v in data.items() if k in valid_cols}
-
+async def fetch_main_account() -> str:
+    """Return the *main* account from DB or raise."""
     async with Session() as s:
-        async with s.begin():
-            s.add(DealLog(**filtered))
+        result = await s.execute(
+            select(Subaccount.account_id)
+            .where(Subaccount.is_default.is_(True))
+            .limit(1)
+        )
+        row = result.first()
+        if not row:
+            raise RuntimeError("No valid account found in DB")
+        return int(row[0])
+
+
+# async def insert_deal(data: dict):
+#     """Insert deal log – silently ignore unknown keys to keep compatibility."""
+#     valid_cols = {c.name for c in DealLog.__table__.columns}  # type: ignore[attr-defined]
+#     filtered = {k: v for k, v in data.items() if k in valid_cols}
+
+#     async with Session() as s:
+#         async with s.begin():
+#             s.add(DealLog(**filtered))

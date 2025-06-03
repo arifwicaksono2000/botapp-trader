@@ -22,7 +22,7 @@ asyncioreactor.install(loop)                  # must be before importing reactor
 from ctrader_open_api import Client, TcpProtocol
 
 from .database import engine, Base
-from .helpers import fetch_access_token
+from .helpers import fetch_access_token, fetch_main_account
 from .settings import HOST, PORT, ACCOUNT_ID, SYMBOL_ID
 from .bot.simple_bot import SimpleBot
 
@@ -43,18 +43,26 @@ def main():
 
     # DB bootstrap
     async def bootstrap():
+        # Create tables once
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
-        return await fetch_access_token()
+
+        # Run both fetches in parallel
+        token_task = fetch_access_token()
+        account_task = fetch_main_account()
+
+        token, account_id = await asyncio.gather(token_task, account_task)
+        return token, account_id
 
     print("[DEBUG] Bootstrapping DB and fetching token...")
-    token = loop.run_until_complete(bootstrap())
+    token, account_id = loop.run_until_complete(bootstrap())
 
-
+    print(f"[DEBUG] Token: {token}… | Account ID: {account_id}")
     # Start the bot
     # print(ACCOUNT_ID, HOST)
     client = Client(HOST, PORT, TcpProtocol)
-    bot = SimpleBot(client, token, ACCOUNT_ID, SYMBOL_ID, args.volume, args.hold)
+    bot = SimpleBot(client, token, account_id, SYMBOL_ID, args.volume, args.hold)
+    # bot = SimpleBot(client, token, ACCOUNT_ID, SYMBOL_ID, args.volume, args.hold)
     # bot = SimpleBot(client, token, ACCOUNT_ID, SYMBOL_ID, args.side, args.volume, args.hold)
     print("[DEBUG] Bot initialized, starting reactor...")
     bot.start()
