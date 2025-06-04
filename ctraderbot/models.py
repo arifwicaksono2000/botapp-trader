@@ -63,64 +63,64 @@ class Subaccount(Base):
     # user = relationship("User")
 
 
-# class Milestone(Base):
-#     __tablename__ = "botcore_milestone"
+class Milestone(Base):
+    __tablename__ = "botcore_milestone"
 
-#     id = Column(Integer, primary_key=True)
-#     starting_balance = Column(DECIMAL(15, 4))
-#     loss = Column(DECIMAL(15, 4))
-#     profit_goal = Column(DECIMAL(15, 4))
-#     lot_size = Column(DECIMAL(10, 4))
-#     ending_balance = Column(DECIMAL(15, 4))
+    id = Column(Integer, primary_key=True)
+    starting_balance = Column(DECIMAL(15, 4))
+    loss = Column(DECIMAL(15, 4))
+    profit_goal = Column(DECIMAL(15, 4))
+    lot_size = Column(DECIMAL(10, 4))
+    ending_balance = Column(DECIMAL(15, 4))
 
 
-# class Segment(Base):
-#     __tablename__ = "botcore_segment"
+class Segment(Base):
+    __tablename__ = "botcore_segment"
 
-#     id = Column(Integer, primary_key=True)
-#     uuid = Column(String(36), unique=True)
-#     subaccount_id = Column(Integer, ForeignKey("botcore_subaccount.id"), nullable=True)
-#     milestone_id = Column(Integer, ForeignKey("botcore_milestone.id"), nullable=True)
-#     total_positions = Column(Integer)
-#     total_balance = Column(DECIMAL(15, 4))
-#     pair = Column(String(10), default="EURUSD")
-#     opened_at = Column(DateTime, default=dt.datetime.utcnow)
-#     closed_at = Column(DateTime, nullable=True)
+    id = Column(Integer, primary_key=True)
+    uuid = Column(String(36), unique=True)
+    subaccount_id = Column(Integer, ForeignKey("botcore_subaccount.id"), nullable=True)
+    milestone_id = Column(Integer, ForeignKey("botcore_milestone.id"), nullable=True)
+    total_positions = Column(Integer)
+    total_balance = Column(DECIMAL(15, 4))
+    pair = Column(String(10), default="EURUSD")
+    opened_at = Column(DateTime, default=dt.datetime.utcnow)
+    closed_at = Column(DateTime, nullable=True)
 
 #     subaccount = relationship("Subaccount")
 #     milestone = relationship("Milestone")
 
 
-# class Trade(Base):
-#     __tablename__ = "botcore_trade"
+class Trade(Base):
+    __tablename__ = "botcore_trade"
 
-#     id = Column(Integer, primary_key=True)
-#     uuid = Column(String(36), unique=True)
-#     curr_active = Column(String(10))  # 'L' or 'S'
-#     current_level = Column(Integer)
-#     achieved_level = Column(Integer)
-#     starting_balance = Column(DECIMAL(15, 4))
-#     profit_goal = Column(DECIMAL(15, 4))
-#     ending_balance = Column(DECIMAL(15, 4))
-#     opened_at = Column(DateTime, default=dt.datetime.utcnow)
-#     closed_at = Column(DateTime, nullable=True)
+    id = Column(Integer, primary_key=True)
+    uuid = Column(String(36), unique=True)
+    curr_active = Column(String(10))  # 'L' or 'S'
+    current_level = Column(Integer)
+    achieved_level = Column(Integer)
+    starting_balance = Column(DECIMAL(15, 4))
+    profit_goal = Column(DECIMAL(15, 4))
+    ending_balance = Column(DECIMAL(15, 4))
+    opened_at = Column(DateTime, default=dt.datetime.utcnow)
+    closed_at = Column(DateTime, nullable=True)
 
 
-# class TradeDetail(Base):
-#     __tablename__ = "botcore_tradedetail"
+class TradeDetail(Base):
+    __tablename__ = "botcore_tradedetail"
 
-#     id = Column(Integer, primary_key=True)
-#     uuid = Column(String(36), unique=True)
-#     trade_id = Column(Integer, ForeignKey("botcore_trade.id"))
-#     position_type = Column(String(10))  # 'long' or 'short'
-#     entry_price = Column(DECIMAL(20, 10))
-#     exit_price = Column(DECIMAL(20, 10), nullable=True)
-#     pips = Column(DECIMAL(10, 2), nullable=True)
-#     latest_balance = Column(DECIMAL(15, 2), nullable=True)
-#     is_liquidated = Column(Boolean, default=False)
-#     lot_size = Column(DECIMAL(10, 2))
-#     response = Column(Text)
-#     opened_at = Column(DateTime, default=dt.datetime.utcnow)
-#     closed_at = Column(DateTime, nullable=True)
+    id = Column(Integer, primary_key=True)
+    uuid = Column(String(36), unique=True)
+    trade_id = Column(Integer, ForeignKey("botcore_trade.id"))
+    position_type = Column(String(10))  # 'long' or 'short'
+    entry_price = Column(DECIMAL(20, 10))
+    exit_price = Column(DECIMAL(20, 10), nullable=True)
+    pips = Column(DECIMAL(10, 2), nullable=True)
+    latest_balance = Column(DECIMAL(15, 2), nullable=True)
+    is_liquidated = Column(Boolean, default=False)
+    lot_size = Column(DECIMAL(10, 2))
+    response = Column(Text)
+    opened_at = Column(DateTime, default=dt.datetime.utcnow)
+    closed_at = Column(DateTime, nullable=True)
 
 #     trade = relationship("Trade", backref="details")

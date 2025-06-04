@@ -44,8 +44,8 @@ def main():
     # DB bootstrap
     async def bootstrap():
         # Create tables once
-        async with engine.begin() as conn:
-            await conn.run_sync(Base.metadata.create_all)
+        # async with engine.begin() as conn:
+        #     await conn.run_sync(Base.metadata.create_all)
 
         # Run both fetches in parallel
         token_task = fetch_access_token()

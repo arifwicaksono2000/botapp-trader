@@ -34,8 +34,7 @@ async def fetch_main_account() -> int:
         if not row:
             raise RuntimeError("No valid account found in DB")
         return int(row[0])
-
-
+    
 # async def insert_deal(data: dict):
 #     """Insert deal log – silently ignore unknown keys to keep compatibility."""
 #     valid_cols = {c.name for c in DealLog.__table__.columns}  # type: ignore[attr-defined]
