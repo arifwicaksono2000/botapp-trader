@@ -2,8 +2,9 @@
 from __future__ import annotations
 
 from sqlalchemy import select, desc
+from sqlalchemy.orm import Session as SyncSession
 
-from .database import Session
+from .database import Session, SessionSync
 from .models import TokenDB, Subaccount, Milestone
 
 
@@ -36,24 +37,26 @@ async def fetch_main_account() -> int:
         return int(row[0])
 
 
-async def fetch_milestone_info(account_id: int):
-    """Return current balance and matching Milestone row for the account."""
-    async with Session() as s:
-        result = await s.execute(
-            select(Subaccount.balance).where(Subaccount.account_id == str(account_id)).limit(1)
-        )
-        row = result.first()
+def fetch_milestone(account_id: int):
+    with SessionSync() as s:
+        row = s.execute(
+            select(Subaccount.balance)
+            .where(Subaccount.account_id == str(account_id))
+            .limit(1)
+        ).first()
         if not row:
             raise RuntimeError("Account not found in DB")
         current_balance = float(row[0])
 
-        result = await s.execute(
-            select(Milestone).where(
+        milestone = s.execute(
+            select(Milestone)
+            .where(
                 Milestone.starting_balance <= current_balance,
                 Milestone.ending_balance >= current_balance,
-            ).limit(1)
-        )
-        milestone = result.scalars().first()
+            )
+            .limit(1)
+        ).scalars().first()
+
         return current_balance, milestone
     
 # async def insert_deal(data: dict):

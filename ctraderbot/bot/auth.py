@@ -17,4 +17,5 @@ def after_account_auth(bot):
         symbolId=[bot.symbol_id],
         subscribeToSpotTimestamp=True,
     ))
-    ensureDeferred(send_market_order(bot))   # ✅ call instance method
+    
+    send_market_order(bot)
