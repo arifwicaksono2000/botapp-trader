@@ -3,8 +3,23 @@ from ctrader_open_api.messages.OpenApiMessages_pb2 import *
 from ctrader_open_api.messages.OpenApiCommonMessages_pb2 import *       # noqa: F403,E402
 from ctrader_open_api.messages.OpenApiModelMessages_pb2 import *       # noqa: F403,E402
 from twisted.internet import reactor
+from ..helpers import fetch_milestone_info
 
-def send_market_order(bot):
+async def send_market_order(bot):
+    balance, milestone = await fetch_milestone_info(bot.account_id)
+    if milestone:
+        info = {
+            "id": milestone.id,
+            "starting_balance": float(milestone.starting_balance),
+            "loss": float(milestone.loss),
+            "profit_goal": float(milestone.profit_goal),
+            "lot_size": float(milestone.lot_size),
+            "ending_balance": float(milestone.ending_balance),
+        }
+        print("[MILESTONE]", info)
+    else:
+        print(f"[MILESTONE] No row for balance {balance}")
+
     # Open a LONG
     req_long = ProtoOANewOrderReq(
         ctidTraderAccountId=bot.account_id,
