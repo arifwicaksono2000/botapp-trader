@@ -16,18 +16,24 @@ def send_market_order(bot):
 
     def on_result(result):
         balance, milestone = result
-        if milestone:
-            info = {
-                "id": milestone.id,
-                "starting_balance": float(milestone.starting_balance),
-                "loss": float(milestone.loss),
-                "profit_goal": float(milestone.profit_goal),
-                "lot_size": float(milestone.lot_size),
-                "ending_balance": float(milestone.ending_balance),
-            }
-            print("[MILESTONE]", info)
-        else:
-            print(f"[MILESTONE] No matching milestone row for balance {balance}")
+        # if milestone:
+        #     info = {
+        #         "id": milestone.id,
+        #         "starting_balance": float(milestone.starting_balance),
+        #         "loss": float(milestone.loss),
+        #         "profit_goal": float(milestone.profit_goal),
+        #         "lot_size": float(milestone.lot_size),
+        #         "curr_lot": bot.volume,
+        #         "ending_balance": float(milestone.ending_balance),
+        #     }
+        #     print("[MILESTONE]", info)
+        # else:
+        #     print(f"[MILESTONE] No matching milestone row for balance {balance}")
+
+        lot_size = milestone.lot_size * 100 * 100000
+        lot_size = int(lot_size)
+
+        # print(lot_size, bot.volume)
 
         # Now that the DB lookup is done, send the two market orders:
 
@@ -37,7 +43,8 @@ def send_market_order(bot):
             symbolId=bot.symbol_id,
             orderType=ProtoOAOrderType.MARKET,
             tradeSide=ProtoOATradeSide.Value("BUY"),
-            volume=bot.volume,
+            volume=lot_size,
+            # volume=bot.volume,
             clientOrderId="OPEN_LONG_1"
         )
         bot.client.send(req_long)
@@ -48,7 +55,8 @@ def send_market_order(bot):
             symbolId=bot.symbol_id,
             orderType=ProtoOAOrderType.MARKET,
             tradeSide=ProtoOATradeSide.Value("SELL"),
-            volume=bot.volume,
+            volume=lot_size,
+            # volume=bot.volume,
             clientOrderId="OPEN_SHORT_2"
         )
         bot.client.send(req_short)
