@@ -1,5 +1,6 @@
 from ctrader_open_api.messages.OpenApiMessages_pb2 import *
 from .trading import send_market_order
+from twisted.internet.defer import ensureDeferred
 
 def after_app_auth(bot):
     print("[✓] App authenticated. Authorizing account…")
@@ -16,4 +17,4 @@ def after_account_auth(bot):
         symbolId=[bot.symbol_id],
         subscribeToSpotTimestamp=True,
     ))
-    send_market_order(bot)   # ✅ call instance method
+    ensureDeferred(send_market_order(bot))   # ✅ call instance method
