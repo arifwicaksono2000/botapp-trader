@@ -12,4 +12,5 @@ mysql-connector-python
 channels
 channels-redis
 httpx
+uuid
 websockets

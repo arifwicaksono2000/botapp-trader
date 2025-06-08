@@ -124,3 +124,10 @@ class TradeDetail(Base):
     closed_at = Column(DateTime, nullable=True)
 
 #     trade = relationship("Trade", backref="details")
+
+class Constant(Base):
+    __tablename__ = "botcore_constant"
+
+    id = Column(Integer, primary_key=True)
+    variable = Column(Text)
+    value = Column(Text)

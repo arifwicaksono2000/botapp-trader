@@ -2,7 +2,9 @@
 import asyncio
 import httpx
 from ctrader_open_api import Protobuf
-
+from twisted.internet.threads import deferToThread
+from ..helpers import manage_segments
+import datetime as dt
 
 def handle_spot_event(bot, msg):
     spot = Protobuf.extract(msg)
@@ -23,6 +25,13 @@ def handle_spot_event(bot, msg):
         data = _build_pnl_payload(bot, pid, pos)
         print(data)
         asyncio.create_task(broadcast_position_update(data))
+    
+    d = deferToThread(manage_segments, bot)
+    
+    # You can add callbacks/errbacks if you want to handle the result
+    # or errors from manage_segments once it completes in the thread.
+    d.addCallback(lambda result: print("manage_segments completed."))
+    d.addErrback(lambda failure: print(f"manage_segments failed: {failure}"))
 
 
 def _update_bid_ask(bot, raw_ask: int, raw_bid: int):

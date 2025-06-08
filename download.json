@@ -1,0 +1,497 @@
+[
+  {
+    "model": "botcore.milestone",
+    "pk": 1,
+    "fields": {
+      "starting_balance": "8.79",
+      "loss": "2.03",
+      "profit_goal": "2.637",
+      "lot_size": "0.02307692308",
+      "ending_balance": "11.427"
+    }
+  },
+  {
+    "model": "botcore.milestone",
+    "pk": 2,
+    "fields": {
+      "starting_balance": "11.427",
+      "loss": "2.637",
+      "profit_goal": "3.4281",
+      "lot_size": "0.034281",
+      "ending_balance": "14.8551"
+    }
+  },
+  {
+    "model": "botcore.milestone",
+    "pk": 3,
+    "fields": {
+      "starting_balance": "14.8551",
+      "loss": "3.4281",
+      "profit_goal": "4.45653",
+      "lot_size": "0.0445653",
+      "ending_balance": "19.31163"
+    }
+  },
+  {
+    "model": "botcore.milestone",
+    "pk": 4,
+    "fields": {
+      "starting_balance": "19.31163",
+      "loss": "4.45653",
+      "profit_goal": "5.793489",
+      "lot_size": "0.05793489",
+      "ending_balance": "25.105119"
+    }
+  },
+  {
+    "model": "botcore.milestone",
+    "pk": 5,
+    "fields": {
+      "starting_balance": "25.105119",
+      "loss": "5.793489",
+      "profit_goal": "7.5315357",
+      "lot_size": "0.075315357",
+      "ending_balance": "32.6366547"
+    }
+  },
+  {
+    "model": "botcore.milestone",
+    "pk": 6,
+    "fields": {
+      "starting_balance": "32.6366547",
+      "loss": "7.5315357",
+      "profit_goal": "9.79099641",
+      "lot_size": "0.0979099641",
+      "ending_balance": "42.42765111"
+    }
+  },
+  {
+    "model": "botcore.milestone",
+    "pk": 7,
+    "fields": {
+      "starting_balance": "42.42765111",
+      "loss": "9.79099641",
+      "profit_goal": "12.72829533",
+      "lot_size": "0.1272829533",
+      "ending_balance": "55.15594644"
+    }
+  },
+  {
+    "model": "botcore.milestone",
+    "pk": 8,
+    "fields": {
+      "starting_balance": "55.15594644",
+      "loss": "12.72829533",
+      "profit_goal": "16.54678393",
+      "lot_size": "0.1654678393",
+      "ending_balance": "71.70273038"
+    }
+  },
+  {
+    "model": "botcore.milestone",
+    "pk": 9,
+    "fields": {
+      "starting_balance": "71.70273038",
+      "loss": "16.54678393",
+      "profit_goal": "21.51081911",
+      "lot_size": "0.2151081911",
+      "ending_balance": "93.21354949"
+    }
+  },
+  {
+    "model": "botcore.milestone",
+    "pk": 10,
+    "fields": {
+      "starting_balance": "93.21354949",
+      "loss": "21.51081911",
+      "profit_goal": "27.96406485",
+      "lot_size": "0.2796406485",
+      "ending_balance": "121.1776143"
+    }
+  },
+  {
+    "model": "botcore.milestone",
+    "pk": 11,
+    "fields": {
+      "starting_balance": "121.1776143",
+      "loss": "27.96406485",
+      "profit_goal": "36.3532843",
+      "lot_size": "0.363532843",
+      "ending_balance": "157.5308986"
+    }
+  },
+  {
+    "model": "botcore.milestone",
+    "pk": 12,
+    "fields": {
+      "starting_balance": "157.5308986",
+      "loss": "36.3532843",
+      "profit_goal": "47.25926959",
+      "lot_size": "0.4725926959",
+      "ending_balance": "204.7901682"
+    }
+  },
+  {
+    "model": "botcore.milestone",
+    "pk": 13,
+    "fields": {
+      "starting_balance": "204.7901682",
+      "loss": "47.25926959",
+      "profit_goal": "61.43705047",
+      "lot_size": "0.6143705047",
+      "ending_balance": "266.2272187"
+    }
+  },
+  {
+    "model": "botcore.milestone",
+    "pk": 14,
+    "fields": {
+      "starting_balance": "266.2272187",
+      "loss": "61.43705047",
+      "profit_goal": "79.86816561",
+      "lot_size": "0.7986816561",
+      "ending_balance": "346.0953843"
+    }
+  },
+  {
+    "model": "botcore.milestone",
+    "pk": 15,
+    "fields": {
+      "starting_balance": "346.0953843",
+      "loss": "79.86816561",
+      "profit_goal": "103.8286153",
+      "lot_size": "1.038286153",
+      "ending_balance": "449.9239996"
+    }
+  },
+  {
+    "model": "botcore.milestone",
+    "pk": 16,
+    "fields": {
+      "starting_balance": "449.9239996",
+      "loss": "103.8286153",
+      "profit_goal": "134.9771999",
+      "lot_size": "1.349771999",
+      "ending_balance": "584.9011995"
+    }
+  },
+  {
+    "model": "botcore.milestone",
+    "pk": 17,
+    "fields": {
+      "starting_balance": "584.9011995",
+      "loss": "134.9771999",
+      "profit_goal": "175.4703598",
+      "lot_size": "1.754703598",
+      "ending_balance": "760.3715593"
+    }
+  },
+  {
+    "model": "botcore.milestone",
+    "pk": 18,
+    "fields": {
+      "starting_balance": "760.3715593",
+      "loss": "175.4703598",
+      "profit_goal": "228.1114678",
+      "lot_size": "2.281114678",
+      "ending_balance": "988.4830271"
+    }
+  },
+  {
+    "model": "botcore.milestone",
+    "pk": 19,
+    "fields": {
+      "starting_balance": "988.4830271",
+      "loss": "228.1114678",
+      "profit_goal": "296.5449081",
+      "lot_size": "2.965449081",
+      "ending_balance": "1285.027935"
+    }
+  },
+  {
+    "model": "botcore.milestone",
+    "pk": 20,
+    "fields": {
+      "starting_balance": "1285.027935",
+      "loss": "296.5449081",
+      "profit_goal": "385.5083806",
+      "lot_size": "3.855083806",
+      "ending_balance": "1670.536316"
+    }
+  },
+  {
+    "model": "botcore.milestone",
+    "pk": 21,
+    "fields": {
+      "starting_balance": "1670.536316",
+      "loss": "385.5083806",
+      "profit_goal": "501.1608947",
+      "lot_size": "5.011608947",
+      "ending_balance": "2171.697211"
+    }
+  },
+  {
+    "model": "botcore.milestone",
+    "pk": 22,
+    "fields": {
+      "starting_balance": "2171.697211",
+      "loss": "501.1608947",
+      "profit_goal": "651.5091632",
+      "lot_size": "6.515091632",
+      "ending_balance": "2823.206374"
+    }
+  },
+  {
+    "model": "botcore.milestone",
+    "pk": 23,
+    "fields": {
+      "starting_balance": "2823.206374",
+      "loss": "651.5091632",
+      "profit_goal": "846.9619121",
+      "lot_size": "8.469619121",
+      "ending_balance": "3670.168286"
+    }
+  },
+  {
+    "model": "botcore.milestone",
+    "pk": 24,
+    "fields": {
+      "starting_balance": "3670.168286",
+      "loss": "846.9619121",
+      "profit_goal": "1101.050486",
+      "lot_size": "11.01050486",
+      "ending_balance": "4771.218772"
+    }
+  },
+  {
+    "model": "botcore.milestone",
+    "pk": 25,
+    "fields": {
+      "starting_balance": "4771.218772",
+      "loss": "1101.050486",
+      "profit_goal": "1431.365631",
+      "lot_size": "14.31365631",
+      "ending_balance": "6202.584403"
+    }
+  },
+  {
+    "model": "botcore.milestone",
+    "pk": 26,
+    "fields": {
+      "starting_balance": "6202.584403",
+      "loss": "1431.365631",
+      "profit_goal": "1860.775321",
+      "lot_size": "18.60775321",
+      "ending_balance": "8063.359724"
+    }
+  },
+  {
+    "model": "botcore.milestone",
+    "pk": 27,
+    "fields": {
+      "starting_balance": "8063.359724",
+      "loss": "1860.775321",
+      "profit_goal": "2419.007917",
+      "lot_size": "24.19007917",
+      "ending_balance": "10482.36764"
+    }
+  },
+  {
+    "model": "botcore.milestone",
+    "pk": 28,
+    "fields": {
+      "starting_balance": "10482.36764",
+      "loss": "2419.007917",
+      "profit_goal": "3144.710292",
+      "lot_size": "31.44710292",
+      "ending_balance": "13627.07793"
+    }
+  },
+  {
+    "model": "botcore.milestone",
+    "pk": 29,
+    "fields": {
+      "starting_balance": "13627.07793",
+      "loss": "3144.710292",
+      "profit_goal": "4088.12338",
+      "lot_size": "40.8812338",
+      "ending_balance": "17715.20131"
+    }
+  },
+  {
+    "model": "botcore.milestone",
+    "pk": 30,
+    "fields": {
+      "starting_balance": "17715.20131",
+      "loss": "4088.12338",
+      "profit_goal": "5314.560394",
+      "lot_size": "53.14560394",
+      "ending_balance": "23029.76171"
+    }
+  },
+  {
+    "model": "botcore.milestone",
+    "pk": 31,
+    "fields": {
+      "starting_balance": "23029.76171",
+      "loss": "5314.560394",
+      "profit_goal": "6908.928512",
+      "lot_size": "69.08928512",
+      "ending_balance": "29938.69022"
+    }
+  },
+  {
+    "model": "botcore.milestone",
+    "pk": 32,
+    "fields": {
+      "starting_balance": "29938.69022",
+      "loss": "6908.928512",
+      "profit_goal": "8981.607066",
+      "lot_size": "89.81607066",
+      "ending_balance": "38920.29729"
+    }
+  },
+  {
+    "model": "botcore.milestone",
+    "pk": 33,
+    "fields": {
+      "starting_balance": "38920.29729",
+      "loss": "8981.607066",
+      "profit_goal": "11676.08919",
+      "lot_size": "116.7608919",
+      "ending_balance": "50596.38647"
+    }
+  },
+  {
+    "model": "botcore.milestone",
+    "pk": 34,
+    "fields": {
+      "starting_balance": "50596.38647",
+      "loss": "11676.08919",
+      "profit_goal": "15178.91594",
+      "lot_size": "151.7891594",
+      "ending_balance": "65775.30241"
+    }
+  },
+  {
+    "model": "botcore.milestone",
+    "pk": 35,
+    "fields": {
+      "starting_balance": "65775.30241",
+      "loss": "15178.91594",
+      "profit_goal": "19732.59072",
+      "lot_size": "197.3259072",
+      "ending_balance": "85507.89314"
+    }
+  },
+  {
+    "model": "botcore.milestone",
+    "pk": 36,
+    "fields": {
+      "starting_balance": "85507.89314",
+      "loss": "19732.59072",
+      "profit_goal": "25652.36794",
+      "lot_size": "256.5236794",
+      "ending_balance": "111160.2611"
+    }
+  },
+  {
+    "model": "botcore.milestone",
+    "pk": 37,
+    "fields": {
+      "starting_balance": "111160.2611",
+      "loss": "25652.36794",
+      "profit_goal": "33348.07832",
+      "lot_size": "333.4807832",
+      "ending_balance": "144508.3394"
+    }
+  },
+  {
+    "model": "botcore.milestone",
+    "pk": 38,
+    "fields": {
+      "starting_balance": "144508.3394",
+      "loss": "33348.07832",
+      "profit_goal": "43352.50182",
+      "lot_size": "433.5250182",
+      "ending_balance": "187860.8412"
+    }
+  },
+  {
+    "model": "botcore.milestone",
+    "pk": 39,
+    "fields": {
+      "starting_balance": "187860.8412",
+      "loss": "43352.50182",
+      "profit_goal": "56358.25237",
+      "lot_size": "563.5825237",
+      "ending_balance": "244219.0936"
+    }
+  },
+  {
+    "model": "botcore.milestone",
+    "pk": 40,
+    "fields": {
+      "starting_balance": "244219.0936",
+      "loss": "56358.25237",
+      "profit_goal": "73265.72808",
+      "lot_size": "732.6572808",
+      "ending_balance": "317484.8217"
+    }
+  },
+  {
+    "model": "botcore.milestone",
+    "pk": 41,
+    "fields": {
+      "starting_balance": "317484.8217",
+      "loss": "73265.72808",
+      "profit_goal": "95245.4465",
+      "lot_size": "952.454465",
+      "ending_balance": "412730.2682"
+    }
+  },
+  {
+    "model": "botcore.milestone",
+    "pk": 42,
+    "fields": {
+      "starting_balance": "412730.2682",
+      "loss": "95245.4465",
+      "profit_goal": "123819.0804",
+      "lot_size": "1238.190804",
+      "ending_balance": "536549.3486"
+    }
+  },
+  {
+    "model": "botcore.milestone",
+    "pk": 43,
+    "fields": {
+      "starting_balance": "536549.3486",
+      "loss": "123819.0804",
+      "profit_goal": "160964.8046",
+      "lot_size": "1609.648046",
+      "ending_balance": "697514.1532"
+    }
+  },
+  {
+    "model": "botcore.milestone",
+    "pk": 44,
+    "fields": {
+      "starting_balance": "697514.1532",
+      "loss": "160964.8046",
+      "profit_goal": "209254.246",
+      "lot_size": "2092.54246",
+      "ending_balance": "906768.3992"
+    }
+  },
+  {
+    "model": "botcore.milestone",
+    "pk": 45,
+    "fields": {
+      "starting_balance": "906768.3992",
+      "loss": "209254.246",
+      "profit_goal": "272030.5197",
+      "lot_size": "2720.305197",
+      "ending_balance": "1178798.919"
+    }
+  }
+]

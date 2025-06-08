@@ -16,6 +16,7 @@ def send_market_order(bot):
 
     def on_result(result):
         balance, milestone = result
+
         # if milestone:
         #     info = {
         #         "id": milestone.id,
@@ -32,6 +33,9 @@ def send_market_order(bot):
 
         lot_size = milestone.lot_size * 100 * 100000
         lot_size = int(lot_size)
+        
+        print("[MILESTONE]", milestone.lot_size)
+        print("[LOT SIZE]", lot_size)
 
         # print(lot_size, bot.volume)
 
