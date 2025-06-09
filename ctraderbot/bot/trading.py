@@ -33,6 +33,8 @@ def send_market_order(bot):
 
         lot_size = milestone.lot_size * 100 * 100000
         lot_size = int(lot_size)
+
+        # lot_size = 3600000
         
         print("[MILESTONE]", milestone.lot_size)
         print("[LOT SIZE]", lot_size)

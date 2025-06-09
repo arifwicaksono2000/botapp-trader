@@ -4,13 +4,13 @@ from ctraderbot.bot.event_handlers import register_callbacks
 from ctraderbot.bot.event_handlers import on_message  # where you defined it
 
 class SimpleBot:
-    def __init__(self, client: Client, access_token, account_id, symbol_id, volume, hold):
+    def __init__(self, client: Client, access_token, account_id, symbol_id, hold):
         self.client = client
         self.access_token = access_token
         self.account_id = account_id
         self.symbol_id = symbol_id
         # self.trade_side = side.upper()
-        self.volume = volume * 100
+        # self.volume = volume * 100
         # self.volume = volume * 100
         self.hold = hold
         self.open_position_id = None
