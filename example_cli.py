@@ -14,8 +14,8 @@ import datetime
 import calendar
 
 if __name__ == "__main__":
-    currentAccountId = 42825116
-    hostType = "live"
+    currentAccountId = 42610743
+    hostType = "demo"
     # hostType = input("Host (Live/Demo): ")
     hostType = hostType.lower()
 
@@ -45,7 +45,7 @@ if __name__ == "__main__":
         print("Token: \n", token)
         accessToken = token["accessToken"]
     else:
-        accessToken = "5VTEuEIo3X2nUWk-APdi6GQC0BsbMXbFopGM2BZEgU8"
+        accessToken = "5X3QrJjpiHPwIj_sNpkhbRs7anvwdilsdeKy82P5nVA"
         # accessToken = input("Access Token: ")
 
     client = Client(EndPoints.PROTOBUF_LIVE_HOST if hostType.lower() == "live" else EndPoints.PROTOBUF_DEMO_HOST, EndPoints.PROTOBUF_PORT, TcpProtocol)

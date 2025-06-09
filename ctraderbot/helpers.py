@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session as SyncSession
 import uuid
 from .database import Session, SessionSync
 from .models import *
+from datetime import timezone
 
 
 async def fetch_access_token() -> str:
@@ -78,8 +79,9 @@ def create_new_segment(
         total_positions=total_positions,
         total_balance=total_balance,
         pair=pair,
-        opened_at=dt.datetime.utcnow(), # Use UTC time for consistency
-        closed_at=None # A new segment is initially open
+        opened_at=dt.datetime.now(timezone.utc), # Use UTC time for consistency
+        closed_at=None, # A new segment is initially open
+        status='running'
     )
 
     with SessionSync() as s:
@@ -101,7 +103,7 @@ def should_open_new_segment(latest_segment_opened_at: dt.datetime) -> bool:
     Returns:
         True if a new segment should be opened, False otherwise.
     """
-    now_utc = dt.datetime.utcnow()
+    now_utc = dt.datetime.now(timezone.utc) # <--- Use timezone.utc here
 
     # Calculate the date for "tomorrow" relative to latest_segment_opened_at
     day_after_opened_at = latest_segment_opened_at + dt.timedelta(days=1)
@@ -191,7 +193,7 @@ def manage_segments(bot):
         if latest_segment.closed_at is None:
             with SessionSync() as s:
                 s.add(latest_segment) # Re-add to session to make it 'dirty'
-                latest_segment.closed_at = dt.datetime.utcnow()
+                latest_segment.closed_at = dt.datetime.now(timezone.utc)
                 s.commit()
                 print(f"Closed previous Segment: ID={latest_segment.id}")
 
@@ -213,12 +215,3 @@ def manage_segments(bot):
         print("Time condition not met. Continuing with the current segment.")
         # Ensure the bot's current_segment_id is set to the latest one found
         bot.current_segment_id = latest_segment.id
-    
-# async def insert_deal(data: dict):
-#     """Insert deal log – silently ignore unknown keys to keep compatibility."""
-#     valid_cols = {c.name for c in DealLog.__table__.columns}  # type: ignore[attr-defined]
-#     filtered = {k: v for k, v in data.items() if k in valid_cols}
-
-#     async with Session() as s:
-#         async with s.begin():
-#             s.add(DealLog(**filtered))

@@ -28,8 +28,13 @@
 
 1. uvicorn ctraderbot.websocket.server:app --host 0.0.0.0 --port 9000 --reload  ==> run for websocket
 2. python -m ctraderbot.cli --hold 60 ==> run for trade bot
-3. python .\setup\get_ctrader_token.py => get initial tokens
-4. python .\setup\get_ctrader_refresh.py => get refresh tokens // If idle for a long time, you have to re-get initial token
+
+## APP SETUP
+
+3. python .\setup\get_ctrader_token.py => get initial tokens for windows
+4. python .\setup\get_ctrader_refresh.py => get refresh tokens for windows
+5. python setup/get_ctrader_token.py => get initial tokens for mac
+6. python setup/get_ctrader_refresh.py => get initial tokens for mac
 
 ## RUN SIMULATION
 
@@ -64,3 +69,13 @@ bot.simulate_trade_cycle()"
 🔹 42825116 ← THIS ONE ACTIVE BALANCE
 🔹 42596960
 🔹 42610743 ← THIS ONE DEMO
+
+## Official Documentation
+
+python example_cli.py
+
+NewMarketOrder 1 BUY 36000 OPEN_EURUSD_BUY_123
+
+GetPositionUnrealizedPnL
+
+ClosePosition 505902038 36000 CLOSE_POS_123

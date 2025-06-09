@@ -1,6 +1,7 @@
 """ORM models used by the bot."""
 from __future__ import annotations
 import datetime as dt
+from datetime import timezone
 
 from sqlalchemy import (
     Boolean,
@@ -27,7 +28,7 @@ class TokenDB(Base):
     refresh_token = Column(Text)
     is_used = Column(Boolean, default=False)
     expires_at = Column(DateTime)
-    created_at = Column(DateTime, default=dt.datetime.utcnow)
+    created_at = Column(DateTime, default=dt.datetime.now(timezone.utc))
 
     # user = relationship("User")
 
@@ -46,7 +47,7 @@ class TokenDB(Base):
 #     swap = Column(Float)
 #     used_margin = Column(Float)
 #     execution_type = Column(Integer)
-#     timestamp = Column(DateTime, default=dt.datetime.utcnow)
+#     timestamp = Column(DateTime, default=dt.datetime.now(timezone.utc))
 
 
 class Subaccount(Base):
@@ -84,8 +85,9 @@ class Segment(Base):
     total_positions = Column(Integer)
     total_balance = Column(DECIMAL(15, 4))
     pair = Column(String(10), default="EURUSD")
-    opened_at = Column(DateTime, default=dt.datetime.utcnow)
+    opened_at = Column(DateTime, default=dt.datetime.now(timezone.utc))
     closed_at = Column(DateTime, nullable=True)
+    status = Column(String(10), default="running")
 
 #     subaccount = relationship("Subaccount")
 #     milestone = relationship("Milestone")
@@ -96,13 +98,13 @@ class Trade(Base):
 
     id = Column(Integer, primary_key=True)
     uuid = Column(String(36), unique=True)
-    curr_active = Column(String(10))  # 'L' or 'S'
+    curr_active = Column(String(10))  # 'L' or 'S' or 'B'
     current_level = Column(Integer)
     achieved_level = Column(Integer)
     starting_balance = Column(DECIMAL(15, 4))
     profit_goal = Column(DECIMAL(15, 4))
     ending_balance = Column(DECIMAL(15, 4))
-    opened_at = Column(DateTime, default=dt.datetime.utcnow)
+    opened_at = Column(DateTime, default=dt.datetime.now(timezone.utc))
     closed_at = Column(DateTime, nullable=True)
 
 
@@ -120,7 +122,7 @@ class TradeDetail(Base):
     is_liquidated = Column(Boolean, default=False)
     lot_size = Column(DECIMAL(10, 2))
     response = Column(Text)
-    opened_at = Column(DateTime, default=dt.datetime.utcnow)
+    opened_at = Column(DateTime, default=dt.datetime.now(timezone.utc))
     closed_at = Column(DateTime, nullable=True)
 
 #     trade = relationship("Trade", backref="details")

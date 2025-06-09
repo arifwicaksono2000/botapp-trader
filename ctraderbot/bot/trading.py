@@ -71,16 +71,16 @@ def send_market_order(bot):
     d.addErrback(lambda failure: print("[DB error]", failure))
 
 
-def close_position(bot, position_id):
+def close_position(bot, position_id, volume_to_close):
     if position_id is None:
         print("[!] No open position to close.")
         return
 
-    print(f"[→] Closing position {position_id}…")
+    print(f"[→] Scheduled close for position {position_id} with volume {volume_to_close}")
     req = ProtoOAClosePositionReq(
         ctidTraderAccountId=bot.account_id,
         positionId=position_id,
-        volume=bot.volume,
+        volume=volume_to_close,
         # mode=ProtoOAClosePositionMode.MARKET  # or whatever mode you prefer
     )
     d = bot.client.send(req)
