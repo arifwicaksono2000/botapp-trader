@@ -17,6 +17,8 @@ def after_account_auth(bot):
     #     symbolId=[bot.symbol_id],
     #     subscribeToSpotTimestamp=True,
     # ))
+
+    # Create initial Segment here!
     
     send_market_order(bot)
     bot.schedule_pnl_updates()

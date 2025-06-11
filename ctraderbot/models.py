@@ -1,4 +1,4 @@
-"""ORM models used by the bot."""
+"""ORM models used by the bot, reconfigured based on Django model definitions."""
 from __future__ import annotations
 import datetime as dt
 from datetime import timezone
@@ -18,38 +18,22 @@ from sqlalchemy import (
 from sqlalchemy.orm import relationship
 from .database import Base
 
-
+# API tokens for bot connection
 class TokenDB(Base):
     __tablename__ = "botcore_token"
 
     id = Column(Integer, primary_key=True)
-    # user_id = Column(Integer, ForeignKey("auth_user.id"), nullable=False)
+    user_id = Column(Integer, ForeignKey("auth_user.id"), nullable=False)
     access_token = Column(Text, nullable=False)
     refresh_token = Column(Text)
     is_used = Column(Boolean, default=False)
     expires_at = Column(DateTime)
     created_at = Column(DateTime, default=dt.datetime.now(timezone.utc))
 
-    # user = relationship("User")
+    def __str__(self):
+        return f"Token {self.id}"
 
-
-# class DealLog(Base):
-#     __tablename__ = "botcore_deallog"
-
-#     id = Column(Integer, primary_key=True)
-#     deal_id = Column(BigInteger)
-#     position_id = Column(BigInteger)
-#     order_id = Column(BigInteger)
-#     side = Column(Text)
-#     volume = Column(BigInteger)
-#     price = Column(Float)
-#     commission = Column(Float)
-#     swap = Column(Float)
-#     used_margin = Column(Float)
-#     execution_type = Column(Integer)
-#     timestamp = Column(DateTime, default=dt.datetime.now(timezone.utc))
-
-
+# Subaccounts management
 class Subaccount(Base):
     __tablename__ = "botcore_subaccount"
 
@@ -61,9 +45,10 @@ class Subaccount(Base):
     balance = Column(DECIMAL(15, 4))
     is_default = Column(Boolean, default=False)
 
-    # user = relationship("User")
+    def __str__(self):
+        return f"{self.name} ({self.platform})"
 
-
+# Milestone checkpoints for hedging strategy
 class Milestone(Base):
     __tablename__ = "botcore_milestone"
 
@@ -74,62 +59,74 @@ class Milestone(Base):
     lot_size = Column(DECIMAL(10, 4))
     ending_balance = Column(DECIMAL(15, 4))
 
+    def __str__(self):
+        return f"Milestone Level {self.id}"
 
+# History records for each hedging trade session
 class Segment(Base):
     __tablename__ = "botcore_segment"
 
     id = Column(Integer, primary_key=True)
-    uuid = Column(String(36), unique=True)
+    uuid = Column(String(36), unique=True, index=True)
     subaccount_id = Column(Integer, ForeignKey("botcore_subaccount.id"), nullable=True)
-    milestone_id = Column(Integer, ForeignKey("botcore_milestone.id"), nullable=True)
     total_positions = Column(Integer)
     total_balance = Column(DECIMAL(15, 4))
     pair = Column(String(10), default="EURUSD")
     opened_at = Column(DateTime, default=dt.datetime.now(timezone.utc))
     closed_at = Column(DateTime, nullable=True)
-    status = Column(String(10), default="running")
+    status = Column(String(10), default='running')
 
-#     subaccount = relationship("Subaccount")
-#     milestone = relationship("Milestone")
+    def __str__(self):
+        return f"Hedging Session {self.id} ({self.pair})"
 
-
+# Model for tracking a full trade cycle (e.g., from one balance level to the next)
 class Trade(Base):
     __tablename__ = "botcore_trade"
 
     id = Column(Integer, primary_key=True)
-    uuid = Column(String(36), unique=True)
-    curr_active = Column(String(10))  # 'L' or 'S' or 'B'
-    current_level = Column(Integer)
-    achieved_level = Column(Integer)
+    uuid = Column(String(36), unique=True, index=True)
+    segment_id = Column(Integer, ForeignKey("botcore_segment.id"), nullable=True)
+    curr_active = Column(String(10))  # 'L', 'S', 'B', 'N'
+    current_level_id = Column(Integer, ForeignKey("botcore_milestone.id"), nullable=True)
+    achieved_level_id = Column(Integer, ForeignKey("botcore_milestone.id"), nullable=True)
     starting_balance = Column(DECIMAL(15, 4))
     profit_goal = Column(DECIMAL(15, 4))
     ending_balance = Column(DECIMAL(15, 4))
     opened_at = Column(DateTime, default=dt.datetime.now(timezone.utc))
     closed_at = Column(DateTime, nullable=True)
+    status = Column(String(10), default='running')
+    
+    def __str__(self):
+        return f"Trades Balance {self.starting_balance}"
 
-
+# Individual trade details (always pairs of Long & Short)
 class TradeDetail(Base):
     __tablename__ = "botcore_tradedetail"
 
     id = Column(Integer, primary_key=True)
-    uuid = Column(String(36), unique=True)
-    trade_id = Column(Integer, ForeignKey("botcore_trade.id"))
+    uuid = Column(String(36), unique=True, index=True)
+    trade_id = Column(Integer, ForeignKey("botcore_trade.id"), nullable=False)
+    segment_id = Column(Integer, ForeignKey("botcore_segment.id"), nullable=True)
+    position_id = Column(BigInteger)
     position_type = Column(String(10))  # 'long' or 'short'
     entry_price = Column(DECIMAL(20, 10))
     exit_price = Column(DECIMAL(20, 10), nullable=True)
     pips = Column(DECIMAL(10, 2), nullable=True)
-    latest_balance = Column(DECIMAL(15, 2), nullable=True)
     is_liquidated = Column(Boolean, default=False)
     lot_size = Column(DECIMAL(10, 2))
-    response = Column(Text)
     opened_at = Column(DateTime, default=dt.datetime.now(timezone.utc))
     closed_at = Column(DateTime, nullable=True)
 
-#     trade = relationship("Trade", backref="details")
+    def __str__(self):
+        return f"{self.position_type.title()} | {self.entry_price} ({'Closed' if self.closed_at else 'Open'})"
 
+# General purpose constants for the bot
 class Constant(Base):
     __tablename__ = "botcore_constant"
 
     id = Column(Integer, primary_key=True)
     variable = Column(Text)
     value = Column(Text)
+    
+    def __str__(self):
+        return f"Defined Variable {self.variable}"
