@@ -26,8 +26,7 @@
 
 ** YOU NEED TO RUN ALL APP SIMULTANEOUSLY, OTHERWISE IT WILL OUPUTS ERRORS
 
-1. uvicorn ctraderbot.websocket.server:app --host 0.0.0.0 --port 9000 --reload  ==> run for websocket
-2. python -m ctraderbot.cli --hold 60 ==> run for trade bot
+1. python -m ctraderbot.cli --hold 60 ==> run for trade bot
 
 ## APP SETUP
 
@@ -75,7 +74,8 @@ bot.simulate_trade_cycle()"
 python example_cli.py
 
 NewMarketOrder 1 BUY 36000 OPEN_EURUSD_BUY_123
+NewMarketOrder 1 SELL 36000 OPEN_EURUSD_BUY_123
 
 GetPositionUnrealizedPnL
 
-ClosePosition 505902038 36000 CLOSE_POS_123
+ClosePosition 506287535 36000 CLOSE_POS_123

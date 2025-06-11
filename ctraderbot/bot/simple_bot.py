@@ -1,6 +1,8 @@
 # simple_bot.py
 from ctrader_open_api import Client
+from .trading import request_unrealized_pnl
 from .event_handlers import register_callbacks
+from twisted.internet import reactor
 
 class SimpleBot:
     def __init__(self, client: Client, access_token, account_id, symbol_id, hold):
@@ -19,11 +21,9 @@ class SimpleBot:
 
     def start(self):
         self.client.startService()
-        from twisted.internet import reactor
         reactor.run()
     
-    # def print_positions(self):
-    #     print("[POSITIONS]")
-    #     for pos_id, data in self.positions.items():
-    #         print(f" - ID {pos_id}: Sym={data['symbolId']}, Vol={data['volume']}, "
-    #             f"PnL={data['unrealisedNetProfit']:.2f}, Margin={data['usedMargin']}")
+    def schedule_pnl_updates(self):
+        """Schedules the bot to request PnL updates every 1 seconds."""
+        request_unrealized_pnl(self)
+        reactor.callLater(1, self.schedule_pnl_updates)

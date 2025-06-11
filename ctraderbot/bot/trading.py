@@ -86,7 +86,10 @@ def close_position(bot, position_id, volume_to_close):
     d = bot.client.send(req)
     d.addErrback(lambda f: print("[✖] Close failed:", f))
 
-
+def request_unrealized_pnl(bot):
+    """Sends a request to get the unrealized PnL for all open positions."""
+    request = ProtoOAGetPositionUnrealizedPnLReq(ctidTraderAccountId=bot.account_id)
+    bot.client.send(request)
 
 def reconcile(bot):
     bot.client.send(ProtoOAReconcileReq(ctidTraderAccountId=bot.account_id))
