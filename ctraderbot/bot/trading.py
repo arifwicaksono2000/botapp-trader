@@ -3,7 +3,7 @@ from ctrader_open_api.messages.OpenApiMessages_pb2 import *
 from ctrader_open_api.messages.OpenApiCommonMessages_pb2 import *       # noqa: F403,E402
 from ctrader_open_api.messages.OpenApiModelMessages_pb2 import *       # noqa: F403,E402
 from twisted.internet import reactor
-from ..helpers import fetch_milestone
+from ..helpers import fetch_milestone, manage_segments
 from twisted.internet.threads import deferToThread
 
 def send_market_order(bot):
@@ -16,6 +16,11 @@ def send_market_order(bot):
 
     def on_result(result):
         balance, milestone = result
+
+        # d = deferToThread(manage_segments, bot)
+    
+        # d.addCallback(lambda result: print("manage_segments completed."))
+        # d.addErrback(lambda failure: print(f"manage_segments failed: {failure}"))
 
         # if milestone:
         #     info = {

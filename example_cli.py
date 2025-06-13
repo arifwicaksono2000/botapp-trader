@@ -45,7 +45,7 @@ if __name__ == "__main__":
         print("Token: \n", token)
         accessToken = token["accessToken"]
     else:
-        accessToken = "7ZfOm4bLYVD0B_RtUnc-YkbXR0a6YYL7LnMg0wB26-w"
+        accessToken = "OYHlnrWr99Ppjvme3B6SQAM14nx3azNOAzz9G_aX7oA"
         # accessToken = input("Access Token: ")
 
     client = Client(EndPoints.PROTOBUF_LIVE_HOST if hostType.lower() == "live" else EndPoints.PROTOBUF_DEMO_HOST, EndPoints.PROTOBUF_PORT, TcpProtocol)
@@ -109,7 +109,7 @@ if __name__ == "__main__":
         print("CancelOrder *orderId clientMsgId")
         print("DealOffsetList *dealId clientMsgId")
         print("GetPositionUnrealizedPnL clientMsgId")
-        print("OrderDetails clientMsgId")
+        print("OrderDetails *orderId clientMsgId")
         print("OrderListByPositionId *positionId fromTimestamp toTimestamp clientMsgId")
 
         reactor.callLater(3, callable=executeUserCommand)

@@ -78,4 +78,8 @@ NewMarketOrder 1 SELL 36000 OPEN_EURUSD_BUY_123
 
 GetPositionUnrealizedPnL
 
+OrderDetails 845486310
+
+OrderListByPositionId 506788875
+
 ClosePosition 506287535 36000 CLOSE_POS_123
