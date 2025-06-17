@@ -10,6 +10,7 @@ from google.protobuf.json_format import MessageToDict
 from .auth import after_app_auth, after_account_auth
 from .execution import handle_execution
 from .pnl_event import handle_pnl_event
+from .stop_operation import stop_reactor
 # from .spot_event import handle_spot_event
 from ..settings import CLIENT_ID, CLIENT_SECRET
 
@@ -44,25 +45,7 @@ def on_message(bot, msg):
     elif pt == ProtoOAExecutionEvent().payloadType:
         handle_execution(bot, Protobuf.extract(msg))
     elif pt == ProtoOAReconcileRes().payloadType:
-        reconcile_res = Protobuf.extract(msg)
-        open_positions = reconcile_res.position
-
-        # --- ADD THIS LOGIC ---
-        if len(open_positions) == 0:
-            print("[✓] Reconcile complete: Confirmed no open positions. Exiting safely.")
-            reactor.stop()
-        else:
-            print("[!!!] CRITICAL WARNING: Reconcile check failed. Unexpected open positions remain!")
-            for pos in open_positions:
-                # Using MessageToDict to cleanly print the unexpected position details
-                from google.protobuf.json_format import MessageToDict
-                print(MessageToDict(pos))
-            
-            print("[!] Halting bot due to unexpected account state.")
-            # In a more advanced implementation, you might trigger an
-            # emergency close_all() function here instead of stopping.
-            # reactor.stop()
-
+        stop_reactor(bot, msg)
     # elif pt == ProtoOASpotEvent().payloadType:
     #     handle_spot_event(bot, msg)
     elif pt in {ProtoOAOrderErrorEvent().payloadType, ProtoOAErrorRes().payloadType}:

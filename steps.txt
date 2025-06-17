@@ -1,5 +1,9 @@
 # STEP TO RUN PROGRAMS
 
+## RUN APP
+
+1. python -m ctraderbot.cli --hold 60
+
 ## CREATE VIRTUAL MACHINE
 
 1. python3 -m venv trenv ==> mac
@@ -22,11 +26,7 @@
 
 1. pip install -r requirements.txt
 
-## RUN APP
 
-** YOU NEED TO RUN ALL APP SIMULTANEOUSLY, OTHERWISE IT WILL OUPUTS ERRORS
-
-1. python -m ctraderbot.cli --hold 60 ==> run for trade bot
 
 ## APP SETUP
 
