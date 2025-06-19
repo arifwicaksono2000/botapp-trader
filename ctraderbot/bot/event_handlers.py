@@ -40,7 +40,6 @@ def on_message(bot, msg):
     # elif pt == ProtoOAPositionUpdateEvent().payloadType:
     #     on_position_update(bot, Protobuf.extract(msg))
     elif pt == ProtoOAGetPositionUnrealizedPnLRes().payloadType:
-        # Here
         handle_pnl_event(bot, msg)
     elif pt == ProtoOAExecutionEvent().payloadType:
         handle_execution(bot, Protobuf.extract(msg))
@@ -53,4 +52,5 @@ def on_message(bot, msg):
         if reactor.running:
             reactor.stop()
     else:
-        print(MessageToDict(Protobuf.extract(msg)))
+        elseError = MessageToDict(Protobuf.extract(msg))
+        print("[✖] Unhandled error:", elseError)

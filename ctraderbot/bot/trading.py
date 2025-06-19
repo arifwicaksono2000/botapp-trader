@@ -3,77 +3,102 @@ from ctrader_open_api.messages.OpenApiMessages_pb2 import *
 from ctrader_open_api.messages.OpenApiCommonMessages_pb2 import *       # noqa: F403,E402
 from ctrader_open_api.messages.OpenApiModelMessages_pb2 import *       # noqa: F403,E402
 from twisted.internet import reactor
-from ..helpers import fetch_milestone, manage_segments
+from ..helpers import *
 from twisted.internet.threads import deferToThread
+
+def _get_or_create_segment_and_trade(bot_instance):
+    """
+    Checks for an existing segment; if none exists, creates one.
+    Then, creates a new trade record associated with the segment.
+    This function is intended to be run in a thread.
+    """
+    # 1. Check for existing segment
+    latest_segment = fetch_latest_segment(bot_instance.account_id)
+
+    # 2. If not, create a new segment
+    if latest_segment is None:
+        print("No existing segment found. Creating a new one.")
+        latest_segment = create_new_segment(
+            subaccount_id=bot_instance.account_pk,
+            milestone_id=bot_instance.milestone.id,
+            total_balance=bot_instance.current_balance,
+            pair="EURUSD"  # Assuming default
+        )
+
+    # 3. Create the trade row
+    trade = create_trade(
+        segment_id=latest_segment.id,
+        milestone_id=bot_instance.milestone.id,
+        current_balance=bot_instance.current_balance
+    )
+    return latest_segment, trade, bot_instance
+
+def _on_segment_trade_result(result):
+    """
+    Callback executed after segment and trade are created.
+    Opens the two hedging positions.
+    """
+    segment, trade, bot = result
+    bot.current_segment_id = segment.id
+    bot.current_trade_id = trade.id
+    print(f"Operating with Segment ID: {bot.current_segment_id} and Trade ID: {bot.current_trade_id}")
+
+    lot_size = int(bot.milestone.lot_size * 100 * 100000)
+    print(f"[LOT SIZE] Calculated volume: {lot_size}")
+
+    # Open a LONG (BUY) position
+    req_long = ProtoOANewOrderReq(
+        ctidTraderAccountId=bot.account_id,
+        symbolId=bot.symbol_id,
+        orderType=ProtoOAOrderType.MARKET,
+        tradeSide=ProtoOATradeSide.Value("BUY"),
+        volume=lot_size,
+        clientOrderId="OPEN_LONG_1"
+    )
+    bot.client.send(req_long)
+
+    # Open a SHORT (SELL) position
+    req_short = ProtoOANewOrderReq(
+        ctidTraderAccountId=bot.account_id,
+        symbolId=bot.symbol_id,
+        orderType=ProtoOAOrderType.MARKET,
+        tradeSide=ProtoOATradeSide.Value("SELL"),
+        volume=lot_size,
+        clientOrderId="OPEN_SHORT_2"
+    )
+    bot.client.send(req_short)
+
+def _on_milestone_result(result, bot):
+    """
+    Callback executed after the milestone is fetched.
+    It initiates the process to get/create the segment and trade.
+    """
+    balance, milestone = result
+    if not milestone:
+        print(f"[ERROR] No matching milestone row for balance {balance}. Halting.")
+        reactor.stop()
+        return
+
+    bot.current_balance = balance
+    bot.milestone = milestone
+    print(f"[MILESTONE] ID: {milestone.id}, Lot Size: {milestone.lot_size}")
+
+    # Defer the segment/trade creation logic to a thread
+    d_segment = deferToThread(_get_or_create_segment_and_trade, bot)
+    d_segment.addCallback(_on_segment_trade_result)
+    d_segment.addErrback(lambda failure: print(f"[DB error] Segment/Trade creation failed: {failure}"))
+
+# --- Main functions called by the bot ---
 
 def send_market_order(bot):
     """
-    Schedule a synchronous DB lookup in a thread, then—when that completes—
-    send two market orders (long + short).
+    Fetches milestone, then kicks off the chain of callbacks to create
+    database records and send the hedging market orders.
     """
-    # Defer the DB lookup to a thread
     d = deferToThread(fetch_milestone, bot.account_id)
-
-    def on_result(result):
-        balance, milestone = result
-
-        # d = deferToThread(manage_segments, bot)
-    
-        # d.addCallback(lambda result: print("manage_segments completed."))
-        # d.addErrback(lambda failure: print(f"manage_segments failed: {failure}"))
-
-        # if milestone:
-        #     info = {
-        #         "id": milestone.id,
-        #         "starting_balance": float(milestone.starting_balance),
-        #         "loss": float(milestone.loss),
-        #         "profit_goal": float(milestone.profit_goal),
-        #         "lot_size": float(milestone.lot_size),
-        #         "curr_lot": bot.volume,
-        #         "ending_balance": float(milestone.ending_balance),
-        #     }
-        #     print("[MILESTONE]", info)
-        # else:
-        #     print(f"[MILESTONE] No matching milestone row for balance {balance}")
-
-        lot_size = milestone.lot_size * 100 * 100000
-        lot_size = int(lot_size)
-
-        # lot_size = 3600000
-        
-        print("[MILESTONE]", milestone.lot_size)
-        print("[LOT SIZE]", lot_size)
-
-        # print(lot_size, bot.volume)
-
-        # Now that the DB lookup is done, send the two market orders:
-
-        # — Open a LONG (BUY)
-        req_long = ProtoOANewOrderReq(
-            ctidTraderAccountId=bot.account_id,
-            symbolId=bot.symbol_id,
-            orderType=ProtoOAOrderType.MARKET,
-            tradeSide=ProtoOATradeSide.Value("BUY"),
-            volume=lot_size,
-            # volume=bot.volume,
-            clientOrderId="OPEN_LONG_1"
-        )
-        bot.client.send(req_long)
-
-        # — Open a SHORT (SELL)
-        req_short = ProtoOANewOrderReq(
-            ctidTraderAccountId=bot.account_id,
-            symbolId=bot.symbol_id,
-            orderType=ProtoOAOrderType.MARKET,
-            tradeSide=ProtoOATradeSide.Value("SELL"),
-            volume=lot_size,
-            # volume=bot.volume,
-            clientOrderId="OPEN_SHORT_2"
-        )
-        bot.client.send(req_short)
-
-    d.addCallback(on_result)
-    d.addErrback(lambda failure: print("[DB error]", failure))
+    # Pass the 'bot' instance to the callback using an additional argument
+    d.addCallback(_on_milestone_result, bot)
+    d.addErrback(lambda failure: print(f"[DB error] Milestone fetch failed: {failure}"))
 
 
 def close_position(bot, position_id, volume_to_close):

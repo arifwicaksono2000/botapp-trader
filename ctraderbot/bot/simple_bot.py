@@ -5,9 +5,10 @@ from .event_handlers import register_callbacks
 from twisted.internet import reactor
 
 class SimpleBot:
-    def __init__(self, client: Client, access_token, account_id, symbol_id, hold):
+    def __init__(self, client: Client, access_token: str, account_pk: int, account_id: int, symbol_id: int, hold: int):
         self.client = client
         self.access_token = access_token
+        self.account_pk = account_pk 
         self.account_id = account_id
         self.symbol_id = symbol_id
         # self.trade_side = side.upper()

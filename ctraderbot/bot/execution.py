@@ -1,11 +1,13 @@
 # execution.py
 import datetime as dt
 from twisted.internet.defer import ensureDeferred
+from twisted.internet.threads import deferToThread
 from ctrader_open_api.messages.OpenApiMessages_pb2 import *
 from ctrader_open_api.messages.OpenApiCommonMessages_pb2 import *       # noqa: F403,E402
 from ctrader_open_api.messages.OpenApiModelMessages_pb2 import *       # noqa: F403,E402
 # from ..helpers import insert_deal
 from .trading import close_position, reconcile
+from ..helpers import create_trade_detail
 from twisted.internet import reactor
 from datetime import timezone
 
@@ -63,15 +65,12 @@ def handle_execution(bot, ev):
 
 
     # --- Handle Execution Types ---
-    # Only proceed with order-specific logic if the order was filled
     if execution_type != ProtoOAExecutionType.ORDER_FILLED:
         print(f"[i] Unhandled Execution Type '{ProtoOAExecutionType.Name(execution_type)}' for pid={pid}, coid={coid}")
         return
 
     # --- Logic for Opening Positions ---
-    # Check if this is an opening order for our hedged pair
-    if coid == "OPEN_LONG_1" or coid == "OPEN_SHORT_2":
-        # A new open order will have a non-zero current_volume
+    if coid in ["OPEN_LONG_1", "OPEN_SHORT_2"]:
         if current_volume > 0:
             if coid == "OPEN_LONG_1":
                 bot.open_long_id = pid
@@ -80,10 +79,19 @@ def handle_execution(bot, ev):
                 bot.open_short_id = pid
                 print(f"[→] Short-opened {pid}. Hold {bot.hold}s…")
             
-            # Schedule closure for both sides using their actual position IDs
-            # Ensure close_position correctly identifies which position to close
-            reactor.callLater(bot.hold, close_position, bot, pid, current_volume) # Pass current_volume for accurate closing
-            return # Handled this event
+            # 4. Create TradeDetails row
+            deferToThread(
+                create_trade_detail,
+                trade_id=bot.current_trade_id,
+                segment_id=bot.current_segment_id,
+                position_id=pid,
+                side=ProtoOATradeSide.Name(side),
+                lot_size=current_volume / 100.0, # Convert from cents
+                entry_price=entry_price
+            ).addErrback(lambda f: print(f"Failed to create TradeDetail for {pid}: {f}"))
+            
+            reactor.callLater(bot.hold, close_position, bot, pid, current_volume)
+            return
 
     # --- Logic for Closing Positions (Full or Partial) ---
     # A position close event can be identified by volume reduction or ProtoOAPositionStatus.POSITION_STATUS_CLOSED
