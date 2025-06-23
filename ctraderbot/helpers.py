@@ -78,7 +78,8 @@ def create_new_segment(
     milestone_id: int, # milestone_id is no longer on the model, but we keep it for now
     total_balance: float,
     pair: str,
-    total_positions: int = 0
+    total_positions: int = 0,
+    is_pivot: bool = False
 ) -> Segments:
     """
     Creates and saves a new Segments entry in the database.
@@ -92,7 +93,8 @@ def create_new_segment(
         pair=pair,
         opened_at=dt.datetime.now(timezone.utc),
         closed_at=None,
-        status='running'
+        status='running',
+        is_pivot=is_pivot
     )
 
     with SessionSync() as s:
@@ -102,7 +104,7 @@ def create_new_segment(
         print(f"Successfully created new Segment: ID={new_segment.id}, UUID={new_segment.uuid}")
         return new_segment
 
-def fetch_latest_segment(subaccount_id: int) -> Segments | None:
+def fetch_running_pivot_segment(subaccount_id: int) -> Segments | None:
     """
     Selects the latest Segments row for a given subaccount_id.
     """
@@ -110,6 +112,8 @@ def fetch_latest_segment(subaccount_id: int) -> Segments | None:
         latest_segment = s.execute(
             select(Segments)
             .where(Segments.subaccount_id == subaccount_id)
+            .where(Segments.is_pivot == True)
+            .where(Segments.status == 'running')
             .order_by(desc(Segments.opened_at))
             .limit(1)
         ).scalars().first()

@@ -59,6 +59,7 @@ class Segments(Base):
     opened_at = Column(DateTime, default=dt.datetime.now(timezone.utc))
     closed_at = Column(DateTime, nullable=True)
     status = Column(String(10), default='running')
+    is_pivot = Column(Boolean, default=False)
 
 class Trades(Base):
     __tablename__ = "botcore_trades"
@@ -96,3 +97,4 @@ class Constant(Base):
     id = Column(Integer, primary_key=True)
     variable = Column(Text)
     value = Column(Text)
+    is_active = Column(Boolean, default=False)

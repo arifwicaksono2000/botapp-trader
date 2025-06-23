@@ -5,6 +5,7 @@ from ctrader_open_api.messages.OpenApiModelMessages_pb2 import *       # noqa: F
 from twisted.internet import reactor
 from ..helpers import *
 from twisted.internet.threads import deferToThread
+from datetime import datetime, timedelta, timezone
 
 def _get_or_create_segment_and_trade(bot_instance):
     """
@@ -12,82 +13,135 @@ def _get_or_create_segment_and_trade(bot_instance):
     Then, creates a new trade record associated with the segment.
     This function is intended to be run in a thread.
     """
-    # 1. Check for existing segment
-    latest_segment = fetch_latest_segment(bot_instance.account_id)
+    # 1. Check for existing running pivot segment
+    pivot_segment = fetch_running_pivot_segment(bot_instance.account_id)
 
     # 2. If not, create a new segment
-    if latest_segment is None:
-        print("No existing segment found. Creating a new one.")
-        latest_segment = create_new_segment(
+    if pivot_segment is None:
+        print("No existing segment pivot found. Creating a new one.")
+
+        with SessionSync() as s:
+            milestone = s.query(Milestone).where(
+                Milestone.starting_balance <= bot_instance.current_balance,
+                Milestone.ending_balance >= bot_instance.current_balance
+            ).first()
+
+        pivot_segment = create_new_segment(
             subaccount_id=bot_instance.account_pk,
-            milestone_id=bot_instance.milestone.id,
+            milestone_id=milestone.id,
             total_balance=bot_instance.current_balance,
-            pair="EURUSD"  # Assuming default
+            pair="EURUSD",  # Assuming default
+            is_pivot=True
         )
 
-    # 3. Create the trade row
-    trade = create_trade(
-        segment_id=latest_segment.id,
-        milestone_id=bot_instance.milestone.id,
-        current_balance=bot_instance.current_balance
-    )
-    return latest_segment, trade, bot_instance
+        # 3. Create the trade row
+        create_trade(
+            segment_id=pivot_segment.id,
+            milestone_id=milestone.id,
+            current_balance=bot_instance.current_balance
+        )
+        
+    else:
+        # --- 1. Check the Time Condition ---
+    
+        # Get the pivot segment's opening date (e.g., 2025-06-20 10:00:00)
+        pivot_open_date = pivot_segment.opened_at
+        
+        # Calculate the target date: the day after it opened
+        target_date = pivot_open_date + timedelta(days=1)
+        
+        # Set the target time to 17:00 UTC on that target date
+        # This creates the full timestamp for comparison (e.g., 2025-06-21 17:00:00)
+        target_datetime_utc = target_date.replace(hour=17, minute=0, second=0, microsecond=0, tzinfo=timezone.utc)
+        
+        # Get the current time in UTC
+        now_utc = datetime.now(timezone.utc)
+        
+        time_condition_met = now_utc >= target_datetime_utc
+
+        # --- 2. Check the Balance Condition ---
+        
+        with SessionSync() as s:
+            initial_level = s.query(Constant).where(
+                Constant.variable == 'initial_level',
+                Constant.is_active == True,
+            ).first()
+
+            # Find the milestone that corresponds to the current balance
+            milestone = s.query(Milestone).where(
+                Milestone.id == initial_level.value
+            ).first()
+                
+            milestone_balance = float(milestone.starting_balance)
+            
+            balance_condition_met = pivot_segment.total_balance >= (2 * milestone_balance)
+        
+        if time_condition_met and balance_condition_met:
+            print("Extending Segments. Creating a new one.")
+            given_balance = pivot_segment.total_balance - milestone_balance
+            pivot_segment = create_new_segment(
+                subaccount_id=bot_instance.account_pk,
+                milestone_id=milestone.id,
+                total_balance=given_balance,
+                pair="EURUSD"  # Assuming default
+            )
+
+            # 3. Create the trade row
+            create_trade(
+                segment_id=pivot_segment.id,
+                milestone_id=milestone.id,
+                current_balance=given_balance
+            )
+    
+    with SessionSync() as s:
+        running_segments = s.query(Segments).where(
+                Segments.status == 'running'
+            ).all()
+        
+    return running_segments, bot_instance
 
 def _on_segment_trade_result(result):
     """
     Callback executed after segment and trade are created.
     Opens the two hedging positions.
     """
-    segment, trade, bot = result
-    bot.current_segment_id = segment.id
-    bot.current_trade_id = trade.id
-    print(f"Operating with Segment ID: {bot.current_segment_id} and Trade ID: {bot.current_trade_id}")
+    running_segments, bot = result
+    for segment in running_segments:
+        with SessionSync() as s:
+            get_trade = s.query(Trades).where(
+                Trades.segment_id == segment.id,
+                Trades.status == 'running',
+            ).order_by(desc(Trades.opened_at)).first()
 
-    lot_size = int(bot.milestone.lot_size * 100 * 100000)
-    print(f"[LOT SIZE] Calculated volume: {lot_size}")
+            get_milestone = s.query(Milestone).where(
+                Milestone.id == get_trade.current_level_id
+            ).first()
+        
+        lot_size = int(get_milestone.lot_size * 100 * 100000)
+        print(f"[LOT SIZE] Calculated volume: {lot_size}")
 
-    # Open a LONG (BUY) position
-    req_long = ProtoOANewOrderReq(
-        ctidTraderAccountId=bot.account_id,
-        symbolId=bot.symbol_id,
-        orderType=ProtoOAOrderType.MARKET,
-        tradeSide=ProtoOATradeSide.Value("BUY"),
-        volume=lot_size,
-        clientOrderId="OPEN_LONG_1"
-    )
-    bot.client.send(req_long)
+        # Open a LONG (BUY) position
+        req_long = ProtoOANewOrderReq(
+            ctidTraderAccountId=bot.account_id,
+            symbolId=bot.symbol_id,
+            orderType=ProtoOAOrderType.MARKET,
+            tradeSide=ProtoOATradeSide.Value("BUY"),
+            volume=lot_size,
+            clientOrderId="OPEN_LONG_1"
+        )
+        bot.client.send(req_long)
 
-    # Open a SHORT (SELL) position
-    req_short = ProtoOANewOrderReq(
-        ctidTraderAccountId=bot.account_id,
-        symbolId=bot.symbol_id,
-        orderType=ProtoOAOrderType.MARKET,
-        tradeSide=ProtoOATradeSide.Value("SELL"),
-        volume=lot_size,
-        clientOrderId="OPEN_SHORT_2"
-    )
-    bot.client.send(req_short)
-
-def _on_milestone_result(result, bot):
-    """
-    Callback executed after the milestone is fetched.
-    It initiates the process to get/create the segment and trade.
-    """
-    balance, milestone = result
-    if not milestone:
-        print(f"[ERROR] No matching milestone row for balance {balance}. Halting.")
-        reactor.stop()
-        return
-
-    bot.current_balance = balance
-    bot.milestone = milestone
-    print(f"[MILESTONE] ID: {milestone.id}, Lot Size: {milestone.lot_size}")
-
-    # Defer the segment/trade creation logic to a thread
-    d_segment = deferToThread(_get_or_create_segment_and_trade, bot)
-    d_segment.addCallback(_on_segment_trade_result)
-    d_segment.addErrback(lambda failure: print(f"[DB error] Segment/Trade creation failed: {failure}"))
-
+        # Open a SHORT (SELL) position
+        req_short = ProtoOANewOrderReq(
+            ctidTraderAccountId=bot.account_id,
+            symbolId=bot.symbol_id,
+            orderType=ProtoOAOrderType.MARKET,
+            tradeSide=ProtoOATradeSide.Value("SELL"),
+            volume=lot_size,
+            clientOrderId="OPEN_SHORT_2"
+        )
+        bot.client.send(req_short)
+            
 # --- Main functions called by the bot ---
 
 def send_market_order(bot):
@@ -95,10 +149,10 @@ def send_market_order(bot):
     Fetches milestone, then kicks off the chain of callbacks to create
     database records and send the hedging market orders.
     """
-    d = deferToThread(fetch_milestone, bot.account_id)
+    d = deferToThread(_get_or_create_segment_and_trade, bot)
     # Pass the 'bot' instance to the callback using an additional argument
-    d.addCallback(_on_milestone_result, bot)
-    d.addErrback(lambda failure: print(f"[DB error] Milestone fetch failed: {failure}"))
+    d.addCallback(_on_segment_trade_result)
+    d.addErrback(lambda failure: print(f"[DB error] Segment management failed: {failure}"))
 
 
 def close_position(bot, position_id, volume_to_close):

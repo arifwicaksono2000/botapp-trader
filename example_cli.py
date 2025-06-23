@@ -45,7 +45,7 @@ if __name__ == "__main__":
         print("Token: \n", token)
         accessToken = token["accessToken"]
     else:
-        accessToken = "OYHlnrWr99Ppjvme3B6SQAM14nx3azNOAzz9G_aX7oA"
+        accessToken = "OVCCGQvstdzT4PsQ97uNEv64w5irWwFR_k2YhDa5cT0"
         # accessToken = input("Access Token: ")
 
     client = Client(EndPoints.PROTOBUF_LIVE_HOST if hostType.lower() == "live" else EndPoints.PROTOBUF_DEMO_HOST, EndPoints.PROTOBUF_PORT, TcpProtocol)
