@@ -156,7 +156,8 @@ def create_trade_detail(trade_id: int, segment_id: int, position_id: int, side: 
             position_id=position_id,
             position_type=position_type,
             entry_price=entry_price,
-            lot_size=lot_size
+            lot_size=lot_size,
+            status='running'
         )
         s.add(new_trade_detail)
         s.commit()

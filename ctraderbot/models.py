@@ -87,7 +87,7 @@ class TradeDetail(Base):
     entry_price = Column(DECIMAL(20, 10))
     exit_price = Column(DECIMAL(20, 10), nullable=True)
     pips = Column(DECIMAL(10, 2), nullable=True)
-    is_liquidated = Column(Boolean, default=False)
+    status = Column(String(10), default='running')
     lot_size = Column(DECIMAL(10, 2))
     opened_at = Column(DateTime, default=dt.datetime.now(timezone.utc))
     closed_at = Column(DateTime, nullable=True)
