@@ -17,6 +17,7 @@ class SimpleBot:
         self.open_position_id = None
         self.positions: dict[int, dict] = {}
         self.latest_price: float = 0.0  # latest bid/ask midpoint
+        self.current_balance = None # Initialize the attribute to None
         
         register_callbacks(self)
 

@@ -1,5 +1,5 @@
 from ctrader_open_api.messages.OpenApiMessages_pb2 import *
-from .trading import send_market_order
+# from .trading import send_market_order
 from twisted.internet.defer import ensureDeferred
 
 def after_app_auth(bot):
@@ -11,6 +11,8 @@ def after_app_auth(bot):
     bot.client.send(req)
 
 def after_account_auth(bot):
+    # Import the function right here, just before you use it.
+    from .trading import send_market_order
     print("[✓] Account authorized. Subscribing + sending order…")
     # bot.client.send(ProtoOASubscribeSpotsReq(
     #     ctidTraderAccountId=bot.account_id,
