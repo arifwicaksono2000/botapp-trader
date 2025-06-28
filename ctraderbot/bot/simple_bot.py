@@ -14,10 +14,12 @@ class SimpleBot:
         # self.trade_side = side.upper()
         # self.volume = volume * 100
         self.hold = hold
+        self.is_shutting_down = False
         self.open_position_id = None
         self.positions: dict[int, dict] = {}
         self.latest_price: float = 0.0  # latest bid/ask midpoint
         self.current_balance = None # Initialize the attribute to None
+        self.pnl_timer = None
         
         register_callbacks(self)
 

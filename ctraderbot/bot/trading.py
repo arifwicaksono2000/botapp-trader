@@ -93,7 +93,8 @@ def _on_reconcile_response(reconcile_res, bot):
                 print(f"--- Trade {trade.id} is healthy. Checking hold time... ---")
                 # We can check the age of the first detail to determine the trade's age.
                 first_detail = details_for_this_trade[0]
-                time_since_open = datetime.now(timezone.utc) - first_detail.opened_at
+                opened_at_aware = first_detail.opened_at.replace(tzinfo=timezone.utc)
+                time_since_open = datetime.now(timezone.utc) - opened_at_aware
                 
                 if time_since_open.total_seconds() >= bot.hold:
                     print(f"[Action] Trade {trade.id} has exceeded hold time ({bot.hold}s). Closing positions.")
@@ -181,19 +182,18 @@ def _get_or_create_segment_and_trade(bot_instance):
             # --- 1. Check the Time Condition ---
         
             # Get the pivot segment's opening date (e.g., 2025-06-20 10:00:00)
-            pivot_open_date = pivot_segment.opened_at
+            # pivot_open_date = pivot_segment.opened_at
+            pivot_open_date_aware = pivot_segment.opened_at.replace(tzinfo=timezone.utc)
             
             # Calculate the target date: the day after it opened
-            target_date = pivot_open_date + timedelta(days=1)
-            
-            # Set the target time to 17:00 UTC on that target date
-            # This creates the full timestamp for comparison (e.g., 2025-06-21 17:00:00)
-            target_datetime_utc = target_date.replace(hour=17, minute=0, second=0, microsecond=0, tzinfo=timezone.utc)
+            target_datetime_utc = (pivot_open_date_aware + timedelta(days=1)).replace(
+                hour=17, minute=0, second=0, microsecond=0
+            )
             
             # Get the current time in UTC
-            now_utc = datetime.now(timezone.utc)
+            # now_utc = datetime.now(timezone.utc)
             
-            time_condition_met = now_utc >= target_datetime_utc
+            time_condition_met = datetime.now(timezone.utc) >= target_datetime_utc
 
             # --- 2. Check the Balance Condition ---
             

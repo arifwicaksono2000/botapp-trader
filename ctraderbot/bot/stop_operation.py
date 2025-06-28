@@ -8,6 +8,19 @@ def graceful_shutdown(bot):
     """
     Sends a logout request to the server to initiate a graceful disconnection.
     """
+    # Prevent this function from running more than once.
+    if bot.is_shutting_down:
+        return
+    
+    print("[Info] Initiating graceful shutdown...")
+    bot.is_shutting_down = True
+
+    # --- THIS IS THE CRITICAL FIX ---
+    # Cancel the main heartbeat timer to stop the loop.
+    if bot.pnl_timer and bot.pnl_timer.active():
+        print("[Info] Cancelling main bot loop timer...")
+        bot.pnl_timer.cancel()
+
     print("[→] Sending logout request for a graceful shutdown...")
     request = ProtoOAAccountLogoutReq(ctidTraderAccountId=bot.account_id)
     bot.client.send(request)

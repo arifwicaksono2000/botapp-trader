@@ -45,12 +45,25 @@ def on_message(bot, msg):
         handle_execution(bot, Protobuf.extract(msg))
     elif pt == ProtoOAReconcileRes().payloadType:
         stop_reactor(bot, msg)
-    # elif pt == ProtoOASpotEvent().payloadType:
-    #     handle_spot_event(bot, msg)
+    elif pt == ProtoOAAccountLogoutRes().payloadType:
+        print("[Info] Logout confirmed by server. Connection will be closed shortly.")
+    elif pt == ProtoOAAccountDisconnectEvent().payloadType:
+        print("[Info] Account disconnected by server.")
+        on_disconnected("Server sent a disconnect event.")
     elif pt in {ProtoOAOrderErrorEvent().payloadType, ProtoOAErrorRes().payloadType}:
+        err = Protobuf.extract(msg)
         print("[✖] Server error:", MessageToDict(Protobuf.extract(msg)))
-        if reactor.running:
-            reactor.stop()
+        stop_reactor(bot, msg)
+
+        # Insert this "if" block to catch the MARKET_CLOSED error
+        # if getattr(err, 'errorCode', '') == 'MARKET_CLOSED':
+        #     print(f"[INFO] Market is closed. The bot cannot place new trades.")
+        #     print("[INFO] Initiating a graceful shutdown.")
+        #     stop_reactor(bot, msg)
+        #     return # Exit the function
+    
+        # if reactor.running:
+        #     reactor.stop()
     else:
         elseError = MessageToDict(Protobuf.extract(msg))
         print("[✖] Unhandled error:", elseError)
