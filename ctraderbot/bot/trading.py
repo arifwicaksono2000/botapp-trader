@@ -12,6 +12,18 @@ from .event_handlers import on_message
 from ctrader_open_api import Protobuf
 from datetime import datetime, timedelta, timezone
 
+def send_market_order(bot):
+    """
+    This is the main entry point from the bot's auth flow.
+    It now kicks off the process by first fetching the account balance.
+    """
+    print("[Info] Fetching account balance to begin trade logic...")
+    # Start the chain by fetching the balance from the DB in a thread
+    d = deferToThread(fetch_account_balance, bot.account_pk)
+    # When the balance is returned, the _on_balance_fetched callback will be executed
+    d.addCallback(_on_balance_fetched, bot)
+    d.addErrback(lambda failure: print(f"[DB ERROR] Failed to fetch account balance: {failure}"))
+
 def _on_balance_fetched(balance, bot):
     """
     Callback executed after the account balance is fetched from the database.
@@ -24,131 +36,6 @@ def _on_balance_fetched(balance, bot):
     d = deferToThread(_get_or_create_segment_and_trade, bot)
     d.addCallback(lambda _: _reconcile_positions(bot))
     d.addErrback(lambda failure: print(f"[DB ERROR] Segment management failed: {failure}"))
-
-def _reconcile_positions(bot_instance):
-    """
-    Orchestrates the entire reconciliation process.
-    1. Fetches server state (all open positions).
-    2. Fetches DB state (all 'running' TradeDetails).
-    3. Compares the two and issues commands to align the server state
-       with the state intended by the database.
-    """
-    print("[Reconcile] Starting full state reconciliation...")
-
-    # Create a Deferred to handle the asynchronous response from the server
-    d = Deferred()
-    d.addCallback(_on_reconcile_response, bot=bot_instance)
-    d.addErrback(lambda failure: print(f"[ERROR] Reconcile request failed: {failure}"))
-
-    # Temporarily override the message handler to catch the specific response
-    def custom_message_handler(_, msg):
-        if msg.payloadType == ProtoOAReconcileRes().payloadType:
-            d.callback(Protobuf.extract(msg))
-            # IMPORTANT: Restore the original message handler after we're done.
-            bot_instance.client.setMessageReceivedCallback(lambda _, m: on_message(bot_instance, m))
-
-    bot_instance.client.setMessageReceivedCallback(custom_message_handler)
-    bot_instance.client.send(ProtoOAReconcileReq(ctidTraderAccountId=bot_instance.account_id))
-
-def _on_reconcile_response(reconcile_res, bot):
-    """
-    Callback executed after receiving the server's state.
-    Contains the core logic for comparing DB state vs. Server state.
-    """
-    # 1. Get the state from the cTrader Server
-    server_positions = {pos.positionId: pos for pos in reconcile_res.position}
-    server_position_ids = server_positions.keys()
-    print(f"[Reconcile] Server State: Found {len(server_positions)} open position(s).")
-
-    with SessionSync() as s:
-        # 2. Get the state from our local Database
-        db_running_details = s.query(TradeDetail).filter(TradeDetail.status == 'running').all()
-        db_position_ids = {detail.position_id for detail in db_running_details}
-        print(f"[Reconcile] Database State: Found {len(db_position_ids)} 'running' position(s).")
-
-        # 3. ACTION: Close "zombie" positions (exist on server, not in DB)
-        positions_to_close = server_position_ids - db_position_ids
-        if positions_to_close:
-            print(f"[Action] Found {len(positions_to_close)} zombie position(s) to close.")
-            for pos_id in positions_to_close:
-                # We need the full position object to get the volume for closing.
-                position_obj = server_positions[pos_id]
-                close_position(bot, pos_id, position_obj.tradeData.volume)
-        else:
-            print("[Reconcile] No zombie positions found on server.")
-
-        # 4. ACTION: Open positions for new trades (exist in DB, not on server)
-        running_trades = s.query(Trades).filter(Trades.status == 'running').all()
-        print(f"[Reconcile] Checking status of {len(running_trades)} running trade(s) in DB.")
-
-        for trade in running_trades:
-            details_for_this_trade = s.query(TradeDetail).filter_by(trade_id=trade.id, status='running').all()
-            
-            has_long = any(d.position_type == 'long' and d.position_id in server_position_ids for d in details_for_this_trade)
-            has_short = any(d.position_type == 'short' and d.position_id in server_position_ids for d in details_for_this_trade)
-
-            # --- THIS IS THE NEW, CORRECTED LOGIC ---
-            # Case 1: The trade is healthy (both positions are open).
-            if has_long and has_short:
-                print(f"--- Trade {trade.id} is healthy. Checking hold time... ---")
-                # We can check the age of the first detail to determine the trade's age.
-                first_detail = details_for_this_trade[0]
-                opened_at_aware = first_detail.opened_at.replace(tzinfo=timezone.utc)
-                time_since_open = datetime.now(timezone.utc) - opened_at_aware
-                
-                if time_since_open.total_seconds() >= bot.hold:
-                    print(f"[Action] Trade {trade.id} has exceeded hold time ({bot.hold}s). Closing positions.")
-                    for detail in details_for_this_trade:
-                        position_obj = server_positions.get(detail.position_id)
-                        if position_obj:
-                            close_position(bot, detail.position_id, position_obj.tradeData.volume)
-                else:
-                    print(f"--- Trade {trade.id} is within hold time. No action taken. ---")
-            
-            # Case 2: The trade is missing one or both positions.
-            else:
-                print(f"--- Trade {trade.id} is missing positions (Long: {has_long}, Short: {has_short}). Taking action. ---")
-                milestone = s.query(Milestone).get(trade.current_level_id)
-                if not milestone:
-                    print(f"[ERROR] Cannot find milestone for Trade {trade.id}. Skipping.")
-                    continue
-                lot_size = int(float(milestone.lot_size) * 100 * 100000)
-
-                # Open only the missing LONG position
-                if not has_long:
-                    print(f"[Action] Opening missing LONG position for Trade {trade.id}")
-                    bot.client.send(ProtoOANewOrderReq(
-                        ctidTraderAccountId=bot.account_id, symbolId=bot.symbol_id, orderType=ProtoOAOrderType.MARKET,
-                        tradeSide=ProtoOATradeSide.Value("BUY"), volume=lot_size, clientOrderId=f"trade_{trade.id}_long_open"
-                        # tradeSide=ProtoOATradeSide.Value("BUY"), volume=lot_size, clientOrderId=f"trade_{trade.id}_long_reopen"
-                    ))
-                # Open only the missing SHORT position
-                if not has_short:
-                    print(f"[Action] Opening missing SHORT position for Trade {trade.id}")
-                    bot.client.send(ProtoOANewOrderReq(
-                        ctidTraderAccountId=bot.account_id, symbolId=bot.symbol_id, orderType=ProtoOAOrderType.MARKET,
-                        tradeSide=ProtoOATradeSide.Value("SELL"), volume=lot_size, clientOrderId=f"trade_{trade.id}_short_open"
-                        # tradeSide=ProtoOATradeSide.Value("SELL"), volume=lot_size, clientOrderId=f"trade_{trade.id}_short_reopen"
-                    ))
-
-        # Mark stale details as closed if their position ID is not on the server
-        for detail in db_running_details:
-            if detail.position_id not in server_position_ids:
-                print(f"[DB Cleanup] Marking stale TradeDetail for position {detail.position_id} as closed.")
-                detail.status = 'closed'
-        s.commit()
-
-def send_market_order(bot):
-    """
-    This is the main entry point from the bot's auth flow.
-    It now kicks off the process by first fetching the account balance.
-    """
-    print("[Info] Fetching account balance to begin trade logic...")
-    # Start the chain by fetching the balance from the DB in a thread
-    d = deferToThread(fetch_account_balance, bot.account_pk)
-    # When the balance is returned, the _on_balance_fetched callback will be executed
-    d.addCallback(_on_balance_fetched, bot)
-    d.addErrback(lambda failure: print(f"[DB ERROR] Failed to fetch account balance: {failure}"))
 
 def _get_or_create_segment_and_trade(bot_instance):
     """
@@ -237,6 +124,145 @@ def _get_or_create_segment_and_trade(bot_instance):
 
     return True # Signal that the DB state is ready
 
+def _reconcile_positions(bot_instance):
+    """
+    Orchestrates the entire reconciliation process.
+    1. Fetches server state (all open positions).
+    2. Fetches DB state (all 'running' TradeDetails).
+    3. Compares the two and issues commands to align the server state
+       with the state intended by the database.
+    """
+    print("[Reconcile] Starting full state reconciliation...")
+
+    # Create a Deferred to handle the asynchronous response from the server
+    d = Deferred()
+    d.addCallback(_on_reconcile_response, bot=bot_instance)
+    d.addErrback(lambda failure: print(f"[ERROR] Reconcile request failed: {failure}"))
+
+    # Temporarily override the message handler to catch the specific response
+    def custom_message_handler(_, msg):
+        if msg.payloadType == ProtoOAReconcileRes().payloadType:
+            d.callback(Protobuf.extract(msg))
+            # IMPORTANT: Restore the original message handler after we're done.
+            bot_instance.client.setMessageReceivedCallback(lambda _, m: on_message(bot_instance, m))
+
+    bot_instance.client.setMessageReceivedCallback(custom_message_handler)
+    bot_instance.client.send(ProtoOAReconcileReq(ctidTraderAccountId=bot_instance.account_id))
+
+def _on_reconcile_response(reconcile_res, bot):
+    """
+    Callback executed after receiving the server's state.
+    Contains the core logic for comparing DB state vs. Server state.
+    """
+    # 1. Get the state from the cTrader Server
+    server_positions = {pos.positionId: pos for pos in reconcile_res.position}
+    server_position_ids = server_positions.keys()
+    print(f"[Reconcile] Server State: Found {len(server_positions)} open position(s).")
+
+    with SessionSync() as s:
+        # 2. Get the state from our local Database
+        db_running_details = s.query(TradeDetail).filter(TradeDetail.status == 'running').all()
+        db_position_ids = {detail.position_id for detail in db_running_details}
+        print(f"[Reconcile] Database State: Found {len(db_position_ids)} 'running' position(s).")
+
+        # 3. ACTION: Close "zombie" positions (exist on server, not in DB)
+        positions_to_close = server_position_ids - db_position_ids
+        if positions_to_close:
+            print(f"[Action] Found {len(positions_to_close)} zombie position(s) to close.")
+            for pos_id in positions_to_close:
+                # We need the full position object to get the volume for closing.
+                position_obj = server_positions[pos_id]
+                close_position(bot, pos_id, position_obj.tradeData.volume)
+        else:
+            print("[Reconcile] No zombie positions found on server.")
+
+        # 4. ACTION: Open positions for new trades (exist in DB, not on server)
+        running_trades = s.query(Trades).filter(Trades.status == 'running').all()
+        print(f"[Reconcile] Checking status of {len(running_trades)} running trade(s) in DB.")
+
+        for trade in running_trades:
+
+            trade_id = trade.id
+            if trade not in bot.trade_couple:
+                bot.trade_couple[trade_id] = {}
+
+            bot.trade_couple[trade_id].update({
+                "trade_id": trade_id,
+                "long_position_id": None,
+                "long_status": None,
+                "short_position_id": None,
+                "short_status": None,
+            })
+        
+            details_for_this_trade = s.query(TradeDetail).filter_by(trade_id=trade.id, status='running').all()
+            
+            has_long = any(d.position_type == 'long' and d.position_id in server_position_ids for d in details_for_this_trade)
+            has_short = any(d.position_type == 'short' and d.position_id in server_position_ids for d in details_for_this_trade)
+
+            # Find the specific long and short position IDs from the details
+            long_pos_id = next((d.position_id for d in details_for_this_trade if d.position_type == 'long'), None)
+            short_pos_id = next((d.position_id for d in details_for_this_trade if d.position_type == 'short'), None)
+
+            bot.trade_couple[trade_id].update({
+                "long_position_id": long_pos_id,
+                "long_status": "running" if has_long else "closed",
+                "short_position_id": short_pos_id,
+                "short_status": "running" if has_short else "closed",
+            })
+
+            # --- THIS IS THE NEW, CORRECTED LOGIC ---
+            # Case 1: The trade is healthy (both positions are open).
+            if has_long and has_short:
+                print(f"--- Trade {trade.id} is healthy. Checking hold time... ---")
+                
+                # We can check the age of the first detail to determine the trade's age.
+                first_detail = details_for_this_trade[0]
+                opened_at_aware = first_detail.opened_at.replace(tzinfo=timezone.utc)
+                time_since_open = datetime.now(timezone.utc) - opened_at_aware
+                
+                if time_since_open.total_seconds() >= bot.hold:
+                    print(f"[Action] Trade {trade.id} has exceeded hold time ({bot.hold}s). Closing positions.")
+                    for detail in details_for_this_trade:
+                        position_obj = server_positions.get(detail.position_id)
+                        if position_obj:
+                            close_position(bot, detail.position_id, position_obj.tradeData.volume)
+                else:
+                    print(f"--- Trade {trade.id} is within hold time. No action taken. ---")
+            
+            # Case 2: The trade is missing one or both positions.
+            else:
+                print(f"--- Trade {trade.id} is missing positions (Long: {has_long}, Short: {has_short}). Taking action. ---")
+
+                milestone = s.query(Milestone).get(trade.current_level_id)
+                if not milestone:
+                    print(f"[ERROR] Cannot find milestone for Trade {trade.id}. Skipping.")
+                    continue
+                lot_size = int(float(milestone.lot_size) * 100 * 100000)
+
+                # Open only the missing LONG position
+                if not has_long:
+                    print(f"[Action] Opening missing LONG position for Trade {trade.id}")
+                    bot.client.send(ProtoOANewOrderReq(
+                        ctidTraderAccountId=bot.account_id, symbolId=bot.symbol_id, orderType=ProtoOAOrderType.MARKET,
+                        tradeSide=ProtoOATradeSide.Value("BUY"), volume=lot_size, clientOrderId=f"trade_{trade.id}_long_open"
+                        # tradeSide=ProtoOATradeSide.Value("BUY"), volume=lot_size, clientOrderId=f"trade_{trade.id}_long_reopen"
+                    ))
+                # Open only the missing SHORT position
+                if not has_short:
+                    print(f"[Action] Opening missing SHORT position for Trade {trade.id}")
+                    bot.client.send(ProtoOANewOrderReq(
+                        ctidTraderAccountId=bot.account_id, symbolId=bot.symbol_id, orderType=ProtoOAOrderType.MARKET,
+                        tradeSide=ProtoOATradeSide.Value("SELL"), volume=lot_size, clientOrderId=f"trade_{trade.id}_short_open"
+                        # tradeSide=ProtoOATradeSide.Value("SELL"), volume=lot_size, clientOrderId=f"trade_{trade.id}_short_reopen"
+                    ))
+
+        # Mark stale details as closed if their position ID is not on the server
+        for detail in db_running_details:
+            if detail.position_id not in server_position_ids:
+                print(f"[DB Cleanup] Marking stale TradeDetail for position {detail.position_id} as closed.")
+                detail.status = 'closed'
+        s.commit()
+
 def _open_positions_for_trade(trade: Trades, bot_instance):
     """
     A dedicated function to open the hedging positions for a single, specific trade.
@@ -257,13 +283,13 @@ def _open_positions_for_trade(trade: Trades, bot_instance):
         bot_instance.client.send(ProtoOANewOrderReq(
             ctidTraderAccountId=bot_instance.account_id, symbolId=bot_instance.symbol_id,
             orderType=ProtoOAOrderType.MARKET, tradeSide=ProtoOATradeSide.Value("BUY"),
-            volume=lot_size, clientOrderId=f"trade_{trade.id}_long"
+            volume=lot_size, clientOrderId=f"trade_{trade.id}_long_open"
         ))
         # Open SHORT position
         bot_instance.client.send(ProtoOANewOrderReq(
             ctidTraderAccountId=bot_instance.account_id, symbolId=bot_instance.symbol_id,
             orderType=ProtoOAOrderType.MARKET, tradeSide=ProtoOATradeSide.Value("SELL"),
-            volume=lot_size, clientOrderId=f"trade_{trade.id}_short"
+            volume=lot_size, clientOrderId=f"trade_{trade.id}_short_open"
         ))
 
 def close_position(bot, position_id, volume_to_close):
@@ -278,8 +304,39 @@ def close_position(bot, position_id, volume_to_close):
         volume=volume_to_close,
         # mode=ProtoOAClosePositionMode.MARKET  # or whatever mode you prefer
     )
+    
     d = bot.client.send(req)
+    # This callback will execute the status update after the close request is sent.
+    d.addCallback(lambda _: _update_status_on_close(position_id))
     d.addErrback(lambda f: print("[✖] Close failed:", f))
+
+def _update_status_on_close(position_id: int):
+    """
+    Updates the status of TradeDetail and parent Trade upon closing a position.
+    """
+    with SessionSync() as s:
+        # 1. Find the TradeDetail
+        trade_detail = s.query(TradeDetail).filter_by(position_id=position_id).first()
+        if not trade_detail:
+            print(f"[DB ERROR] Could not find TradeDetail for positionId: {position_id}")
+            return
+
+        # 2. Update TradeDetail status
+        if trade_detail.position_type == 'long':
+            trade_detail.status = 'successful'
+        elif trade_detail.position_type == 'short':
+            trade_detail.status = 'liquidated'
+
+        print(f"[DB UPDATE] Updated TradeDetail {trade_detail.id} for Pos {position_id} to status '{trade_detail.status}'")
+
+        # 3. Update parent Trade status
+        parent_trade_id = trade_detail.trade_id
+        parent_trade = s.query(Trades).get(parent_trade_id)
+        if parent_trade:
+            parent_trade.status = 'successful'
+            print(f"[DB UPDATE] Updated parent Trade {parent_trade.id} to status 'successful'")
+
+        s.commit()
 
 def request_unrealized_pnl(bot):
     request = ProtoOAGetPositionUnrealizedPnLReq(ctidTraderAccountId=bot.account_id)

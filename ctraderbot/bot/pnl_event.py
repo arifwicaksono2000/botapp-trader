@@ -35,6 +35,11 @@ def handle_pnl_event(bot, msg):
                 "grossUnrealisedPnL": round(gross_unrealized_pnl, 2), # Added for completeness
                 "status":        pos_data["status"],
             }
+
+            # with SessionSync() as s:
+            #     tradeDetail = s.query(TradeDetail).filter_by(position_id=position_id).one()
+            #     segment = s.query(Segments).filter_by(id=tradeDetail.segment_id).one()
+
             print(f"[DEBUG] PnL: {update_payload}")
             asyncio.create_task(broadcast_position_update(update_payload))
 

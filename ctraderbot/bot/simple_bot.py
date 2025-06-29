@@ -11,16 +11,14 @@ class SimpleBot:
         self.account_pk = account_pk 
         self.account_id = account_id
         self.symbol_id = symbol_id
-        # self.trade_side = side.upper()
-        # self.volume = volume * 100
         self.hold = hold
         self.is_shutting_down = False
-        self.open_position_id = None
         self.positions: dict[int, dict] = {}
-        self.latest_price: float = 0.0  # latest bid/ask midpoint
-        self.current_balance = None # Initialize the attribute to None
+        self.trade_couple: dict[int, dict] = {}
         self.pnl_timer = None
-        
+
+        self.current_balance = None # Used to initalize price from boot
+
         register_callbacks(self)
 
     def start(self):
