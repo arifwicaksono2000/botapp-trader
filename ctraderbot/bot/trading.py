@@ -187,12 +187,20 @@ def _on_reconcile_response(reconcile_res, bot):
 
         for trade in running_trades:
 
+            milestone = s.query(Milestone).get(trade.current_level_id)
+            if not milestone:
+                print(f"[ERROR] Cannot find milestone for Trade {trade.id}. Skipping.")
+                continue
+            lot_size = int(float(milestone.lot_size) * 100 * 100000)
+            ending_balance = milestone.ending_balance
+
             trade_id = trade.id
             if trade not in bot.trade_couple:
                 bot.trade_couple[trade_id] = {}
 
             bot.trade_couple[trade_id].update({
                 "trade_id": trade_id,
+                "ending_balance": ending_balance,
                 "long_position_id": None,
                 "long_status": None,
                 "short_position_id": None,
@@ -239,11 +247,7 @@ def _on_reconcile_response(reconcile_res, bot):
             else:
                 print(f"--- Trade {trade.id} is missing positions (Long: {has_long}, Short: {has_short}). Taking action. ---")
 
-                milestone = s.query(Milestone).get(trade.current_level_id)
-                if not milestone:
-                    print(f"[ERROR] Cannot find milestone for Trade {trade.id}. Skipping.")
-                    continue
-                lot_size = int(float(milestone.lot_size) * 100 * 100000)
+
 
                 # Open only the missing LONG position
                 if not has_long:
