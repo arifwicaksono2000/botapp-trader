@@ -46,11 +46,16 @@ def _get_or_create_segment_and_trade(bot_instance):
     with SessionSync() as s:
         pivot_segment = fetch_running_pivot_segment(bot_instance.account_pk)
         if pivot_segment is None:
+            constant = s.query(Constant).where(
+                Constant.variable == 'initial_level',
+                Constant.is_active == True
+            ).first()
+
             # Create a new pivot segment and its first trade
             milestone = s.query(Milestone).where(
-                Milestone.starting_balance <= bot_instance.current_balance,
-                Milestone.ending_balance >= bot_instance.current_balance
+                Milestone.id <= int(constant.value)
             ).first()
+            
             if not milestone: raise RuntimeError("No milestone found for current balance.")
             
             new_pivot = create_new_segment(
