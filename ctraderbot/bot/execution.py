@@ -78,7 +78,21 @@ def handle_execution(bot, ev):
             try:
                 # Parse the clientOrderId (e.g., "trade_1_long_reopen")
                 parts = coid.split('_')
+                
+                # --- START: ADD THIS NEW BLOCK ---
                 trade_id = int(parts[1])
+                position_type = parts[2] # This will be 'long' or 'short'
+
+                # Update the trade_couple dictionary with the new position ID
+                if trade_id in bot.trade_couple:
+                    if position_type == 'long':
+                        bot.trade_couple[trade_id]['long_position_id'] = pid
+                        bot.trade_couple[trade_id]['long_status'] = 'running'
+                    elif position_type == 'short':
+                        bot.trade_couple[trade_id]['short_position_id'] = pid
+                        bot.trade_couple[trade_id]['short_status'] = 'running'
+                    print(f"[INFO] Updated trade_couple for trade {trade_id} with new position {pid}")
+                # --- END: ADD THIS NEW BLOCK ---
                 
                 # Find the segment_id from the parent trade
                 with SessionSync() as s:

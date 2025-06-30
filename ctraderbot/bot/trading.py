@@ -200,20 +200,21 @@ def _on_reconcile_response(reconcile_res, bot):
             has_short = any(d.position_type == 'short' and d.position_id in server_position_ids for d in details_for_this_trade)
 
             # Find the specific long and short position IDs from the details
-            long_pos_id = next((d.position_id for d in details_for_this_trade if d.position_type == 'long'), None)
-            short_pos_id = next((d.position_id for d in details_for_this_trade if d.position_type == 'short'), None)
-
-            bot.trade_couple[trade_id].update({
-                "long_position_id": long_pos_id,
-                "long_status": "running" if has_long else "closed",
-                "short_position_id": short_pos_id,
-                "short_status": "running" if has_short else "closed",
-            })
-
+          
             # --- THIS IS THE NEW, CORRECTED LOGIC ---
             # Case 1: The trade is healthy (both positions are open).
             if has_long and has_short:
                 print(f"--- Trade {trade.id} is healthy. Checking hold time... ---")
+
+                long_pos_id = next((d.position_id for d in details_for_this_trade if d.position_type == 'long'), None)
+                short_pos_id = next((d.position_id for d in details_for_this_trade if d.position_type == 'short'), None)
+
+                bot.trade_couple[trade_id].update({
+                    "long_position_id": long_pos_id,
+                    "long_status": "running",
+                    "short_position_id": short_pos_id,
+                    "short_status": "running",
+                })
                 
                 # We can check the age of the first detail to determine the trade's age.
                 first_detail = details_for_this_trade[0]
@@ -241,7 +242,17 @@ def _on_reconcile_response(reconcile_res, bot):
 
                 # Open only the missing LONG position
                 if not has_long:
+                    short_pos_id = next((d.position_id for d in details_for_this_trade if d.position_type == 'short'), None)
+
+                    bot.trade_couple[trade_id].update({
+                        "long_position_id": None,
+                        "long_status": "closed",
+                        "short_position_id": short_pos_id,
+                        "short_status": "running",
+                    })
+
                     print(f"[Action] Opening missing LONG position for Trade {trade.id}")
+
                     bot.client.send(ProtoOANewOrderReq(
                         ctidTraderAccountId=bot.account_id, symbolId=bot.symbol_id, orderType=ProtoOAOrderType.MARKET,
                         tradeSide=ProtoOATradeSide.Value("BUY"), volume=lot_size, clientOrderId=f"trade_{trade.id}_long_open"
@@ -249,7 +260,17 @@ def _on_reconcile_response(reconcile_res, bot):
                     ))
                 # Open only the missing SHORT position
                 if not has_short:
+                    long_pos_id = next((d.position_id for d in details_for_this_trade if d.position_type == 'long'), None)
+
+                    bot.trade_couple[trade_id].update({
+                        "long_position_id": long_pos_id,
+                        "long_status": "running",
+                        "short_position_id": None,
+                        "short_status": "closed",
+                    })
+
                     print(f"[Action] Opening missing SHORT position for Trade {trade.id}")
+
                     bot.client.send(ProtoOANewOrderReq(
                         ctidTraderAccountId=bot.account_id, symbolId=bot.symbol_id, orderType=ProtoOAOrderType.MARKET,
                         tradeSide=ProtoOATradeSide.Value("SELL"), volume=lot_size, clientOrderId=f"trade_{trade.id}_short_open"
@@ -269,6 +290,14 @@ def _open_positions_for_trade(trade: Trades, bot_instance):
     """
     if not trade:
         return
+    
+    bot_instance.trade_couple[trade.id] = {
+        "trade_id": trade.id,
+        "long_position_id": None, # This will be set at execution response
+        "long_status": None,
+        "short_position_id": None, # This will be set at execution response
+        "short_status": None,
+    }
 
     with SessionSync() as s:
         milestone = s.query(Milestone).get(trade.current_level_id)

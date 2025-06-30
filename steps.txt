@@ -26,8 +26,6 @@
 
 1. pip install -r requirements.txt
 
-
-
 ## APP SETUP
 
 3. python .\setup\get_ctrader_token.py => get initial tokens for windows
