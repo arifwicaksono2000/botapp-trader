@@ -3,6 +3,7 @@ from ctrader_open_api import Client
 from .trading import request_unrealized_pnl
 from .event_handlers import register_callbacks
 from twisted.internet import reactor
+import datetime
 
 class SimpleBot:
     def __init__(self, client: Client, access_token: str, account_pk: int, account_id: int, symbol_id: int, hold: int):
@@ -25,7 +26,48 @@ class SimpleBot:
         self.client.startService()
         reactor.run()
     
+    def start_schedules(self):
+        """Starts all recurring tasks for the bot."""
+        # Start your other tasks
+        self.schedule_pnl_updates()
+
+        # Start the new specific task for 19:00
+        self.schedule_daily_task_at_19()
+    
     def schedule_pnl_updates(self):
         """Schedules the bot to request PnL updates every 1 seconds."""
         request_unrealized_pnl(self)
         reactor.callLater(1, self.schedule_pnl_updates)
+    
+    def schedule_daily_task_at_19(self):
+        """Calculates the delay to the next 19:00 and schedules the task."""
+        now = datetime.datetime.now()
+        
+        # Set the target time to today at 19:00
+        target_time = now.replace(hour=19, minute=0, second=0, microsecond=0)
+        
+        # If it's already past 19:00 today, schedule it for tomorrow
+        if now > target_time:
+            print("[SCHEDULER] It's past 19:00 today. Scheduling for tomorrow.")
+            target_time += datetime.timedelta(days=1)
+            
+        # Calculate the delay in seconds
+        delay_seconds = (target_time - now).total_seconds()
+        
+        print(f"[SCHEDULER] Specific 19:00 task will run at {target_time} (in {delay_seconds:.0f} seconds).")
+        reactor.callLater(delay_seconds, self.run_daily_task_at_19)
+
+    def run_daily_task_at_19(self):
+        """
+        This is the actual task that will run at 19:00.
+        It reschedules itself to run again the next day.
+        """
+        print(f"🎉 [SCHEDULER] Running specific task at {datetime.datetime.now()}! 🎉")
+        
+        # --- PLACE YOUR 19:00-SPECIFIC LOGIC HERE ---
+        # For example, you could call a function to close all open positions:
+        # close_all_positions(self)
+        
+        # Reschedule this task to run again tomorrow (24 hours * 3600 seconds)
+        # This creates a recurring daily task.
+        reactor.callLater(24 * 3600, self.run_daily_task_at_19)

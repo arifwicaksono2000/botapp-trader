@@ -56,67 +56,69 @@ async def broadcast_position_update(data):
 
 def _check_trade_status_on_pnl(bot, position_id, halved_balance, pnl):
     """
-    Checks for liquidation or success conditions and updates the database.
-    This function is designed to be run in a separate thread.
+    Checks for liquidation or success conditions using ONLY in-memory data.
+    If a condition is met, it triggers a background DB update.
     """
     trade_id = None
     trade_info = None
+    position_side = None
 
-    # 1. Find the trade_id and which side this position belongs to
+    # 1. Find the trade and which side this position belongs to from memory
     for t_id, couple in bot.trade_couple.items():
         if couple.get("long_position_id") == position_id:
             trade_id = t_id
             trade_info = couple
+            position_side = "long"
             break
         if couple.get("short_position_id") == position_id:
             trade_id = t_id
             trade_info = couple
+            position_side = "short"
             break
 
-    if not trade_id:
-        # This can happen briefly if a PnL event arrives before the trade_couple is updated
+    if not trade_id or trade_info.get(f"{position_side}_status") != "running":
+        # Exit if trade not found or the position is not in a 'running' state in memory
         return
 
     ending_balance = float(trade_info["ending_balance"])
-    should_update_trade = False
-    new_trade_status = None
+    new_status = None
 
+    # 2. Check for Liquidation in memory
+    if halved_balance + pnl <= 0:
+        print(f"[!!!] LIQUIDATION DETECTED for position {position_id} in trade {trade_id}")
+        new_status = 'liquidated'
+        trade_info[f"{position_side}_status"] = new_status
+
+    # 3. Check for Success in memory
+    elif halved_balance + pnl > ending_balance:
+        print(f"[$$$] SUCCESS DETECTED for position {position_id} in trade {trade_id}")
+        new_status = 'successful'
+        trade_info[f"{position_side}_status"] = new_status
+
+    # 4. If a status change occurred, trigger the background DB update
+    if new_status:
+        deferToThread(_update_db_on_trade_event, trade_id, position_id, new_status, pnl)
+
+def _update_db_on_trade_event(trade_id, position_id, new_status, pnl):
+    """
+    Updates the database in a separate thread after a success or liquidation event.
+    """
     with SessionSync() as s:
+        # Update the specific TradeDetail
         trade_detail = s.query(TradeDetail).filter_by(position_id=position_id).first()
         if not trade_detail or trade_detail.status != 'running':
-            return # Skip if detail not found or already closed
+            return # Already closed, do nothing
 
-        # 2. Check for Liquidation
-        if halved_balance + pnl <= 0:
-            print(f"[!!!] LIQUIDATION DETECTED for position {position_id} in trade {trade_id}")
-            trade_detail.status = 'liquidated'
-            
-            # Check if the other position is also liquidated
-            other_pos_liquidated = False
-            if trade_detail.position_type == 'long':
-                if trade_info.get("short_status") == 'liquidated':
-                    other_pos_liquidated = True
-            elif trade_detail.position_type == 'short':
-                if trade_info.get("long_status") == 'liquidated':
-                    other_pos_liquidated = True
-            
-            if other_pos_liquidated:
-                should_update_trade = True
-                new_trade_status = 'liquidated'
+        trade_detail.status = new_status
+        trade_detail.closed_at = dt.datetime.now(dt.timezone.utc)
+        print(f"[DB UPDATE] Set TradeDetail for position {position_id} to '{new_status}'")
 
-        # 3. Check for Success
-        elif halved_balance + pnl > ending_balance:
-            print(f"[$$$] SUCCESS DETECTED for position {position_id} in trade {trade_id}")
-            trade_detail.status = 'successful'
-            should_update_trade = True
-            new_trade_status = 'successful'
-        
-        # 4. Update parent Trade if necessary
-        if should_update_trade:
-            parent_trade = s.query(Trades).get(trade_id)
-            if parent_trade and parent_trade.status == 'running':
-                parent_trade.status = new_trade_status
-                parent_trade.ending_balance = float(parent_trade.starting_balance) + pnl
-                parent_trade.closed_at = dt.datetime.now(dt.timezone.utc)
+        # If the parent trade is now successful or fully liquidated, update it
+        parent_trade = s.query(Trades).get(trade_id)
+        if parent_trade and parent_trade.status == 'running':
+            parent_trade.status = new_status # Set to 'successful' or 'liquidated'
+            parent_trade.ending_balance = float(parent_trade.starting_balance) + pnl
+            parent_trade.closed_at = dt.datetime.now(dt.timezone.utc)
+            print(f"[DB UPDATE] Set parent Trade {trade_id} to '{new_status}'")
 
         s.commit()
