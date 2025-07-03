@@ -235,3 +235,33 @@ def fetch_account_balance(account_pk: int) -> float:
         if not subaccount:
             raise RuntimeError(f"Subaccount with pk {account_pk} not found.")
         return float(subaccount.balance)
+
+def update_trade_detail_on_close(position_id: int, exit_price: float, commission: float, swap: float, final_status: str):
+    """Updates a single TradeDetail row when a position is closed."""
+    with SessionSync() as s:
+        trade_detail = s.query(TradeDetail).filter_by(position_id=position_id).first()
+        if not trade_detail or trade_detail.status != 'running':
+            return # Already handled
+
+        trade_detail.exit_price = exit_price
+        trade_detail.closed_at = dt.datetime.now(dt.timezone.utc)
+        trade_detail.status = final_status # 'successful' or 'liquidated'
+        
+        # Calculate pips
+        pips = (exit_price - float(trade_detail.entry_price)) * 10000
+        if trade_detail.position_type == 'short':
+            pips = -pips
+        trade_detail.pips = pips
+        
+        print(f"[DB UPDATE] Set TradeDetail for Pos {position_id} to '{final_status}'.")
+        s.commit()
+
+def update_parent_trade_status(trade_id: int, final_status: str):
+    """Updates the parent Trade row to a final status."""
+    with SessionSync() as s:
+        parent_trade = s.query(Trades).get(trade_id)
+        if parent_trade and parent_trade.status == 'running':
+            parent_trade.status = final_status
+            parent_trade.closed_at = dt.datetime.now(dt.timezone.utc)
+            print(f"[DB UPDATE] Set parent Trade {trade_id} to '{final_status}'.")
+            s.commit()

@@ -247,8 +247,6 @@ def _on_reconcile_response(reconcile_res, bot):
             else:
                 print(f"--- Trade {trade.id} is missing positions (Long: {has_long}, Short: {has_short}). Taking action. ---")
 
-
-
                 # Open only the missing LONG position
                 if not has_long:
                     short_pos_id = next((d.position_id for d in details_for_this_trade if d.position_type == 'short'), None)

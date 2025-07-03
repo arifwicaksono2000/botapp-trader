@@ -11,6 +11,7 @@ from ..helpers import *
 from twisted.internet import reactor
 from datetime import timezone
 from ..database import SessionSync
+from .trading import _get_or_create_segment_and_trade
 
 def handle_execution(bot, ev):
     print("[✓] Execution Event:")
@@ -122,10 +123,10 @@ def handle_execution(bot, ev):
                 
                 # We only schedule a close for the initial positions, not re-opened ones.
                 # You might want to add more sophisticated logic for re-opened positions here.
-                if "reopen" not in coid:
-                    print(f"[CLOSE POSITION SCHEDULED] Trade with id {trade_id} for coid {coid}")
-                    from .trading import close_position
-                    reactor.callLater(bot.hold, close_position, bot, pid, current_volume)
+                # if "reopen" not in coid:
+                #     print(f"[CLOSE POSITION SCHEDULED] Trade with id {trade_id} for coid {coid}")
+                #     from .trading import close_position
+                #     reactor.callLater(bot.hold, close_position, bot, pid, current_volume)
                 
                 return # Exit after handling the open event
             except (IndexError, ValueError) as e:
@@ -135,25 +136,79 @@ def handle_execution(bot, ev):
     # --- Logic for Closing Positions (Full or Partial) ---
     if pos.positionStatus == 2: # POSITION_STATUS_CLOSED
         print(f"[✓] Position {pid} is reported as CLOSED.")
-        
-        # Update our database records to reflect the closure
+
+        # Defer the entire closing workflow to a background thread
         deferToThread(
-            update_trade_on_close,
-            position_id=pid, 
-            exit_price=deal.executionPrice,
-            commission=deal.commission, 
-            swap=pos.swap
-        ).addErrback(lambda f: print(f"[DB ERROR] Failed to update closed position {pid}: {f}"))
+            _handle_closed_position_workflow,
+            bot,
+            pid,
+            deal.executionPrice,
+            deal.commission,
+            pos.swap
+        ).addErrback(lambda f: print(f"[!!!] Closed position workflow failed for {pid}: {f}"))
         
-        # After closing, we reconcile to ensure the bot's state is aligned.
-        # You could add logic here to check if the other leg of the hedge is also closed
-        # before reconciling, if desired.
-        from .trading import reconcile
-        reconcile(bot)
-        return
+        return # End execution here, the thread will handle the rest
 
     # --- Fallback for any other unhandled scenario ---
     print(f"[i] Unhandled ORDER_FILLED scenario for pid={pid}, coid={coid}")
+
+def _handle_closed_position_workflow(bot, closed_pid, exit_price, commission, swap):
+    """
+    Manages the full workflow after a position is confirmed closed.
+    This runs in a background thread.
+    """
+    # 1. Find which trade this position belongs to
+    trade_id = None
+    trade_info = None
+    closed_side = None
+
+    # get which position is closed from coid
+    for t_id, couple in bot.trade_couple.items():
+        if couple.get("long_position_id") == closed_pid:
+            trade_id, trade_info, closed_side = t_id, couple, "long"
+            break
+        if couple.get("short_position_id") == closed_pid:
+            trade_id, trade_info, closed_side = t_id, couple, "short"
+            break
+
+    if not trade_id:
+        print(f"[WARN] Could not find trade couple for closed position {closed_pid}. No action taken.")
+        return
+
+    # 2. Update the database for the single closed position
+    final_status = trade_info.get(f"{closed_side}_status") # 'successful' or 'liquidated'
+    update_trade_detail_on_close(closed_pid, exit_price, commission, swap, final_status)
+
+    # 3. Check if both positions in the couple are now closed
+    if closed_side == "long":
+        other_side = "short"
+    elif closed_side == "short":
+        other_side = "long"
+    else:
+        print(f"[ERROR] Unknown closed side '{closed_side}' for position {closed_pid}. Cannot determine other side.")
+        return
+
+    other_pos_status = trade_info.get(f"{other_side}_status")
+
+    if other_pos_status not in ['successful', 'liquidated', 'closed']:
+        print(f"[INFO] Position {closed_pid} closed. Other side ({other_side}) is still running. Waiting...")
+        return
+    
+    # 4. If both are closed, finalize the trade and start a new one
+    print(f"[>>>] Both positions for trade {trade_id} are {other_pos_status}. Finalizing trade cycle.")
+    
+    # Update the parent Trade row status to successful/liquidated
+    update_parent_trade_status(trade_id, final_status)
+
+    # 5. Reconcile to ensure the account is clean before starting a new trade
+    from .trading import reconcile
+    reconcile(bot)
+    
+    # 6. Trigger the creation of a new trade cycle
+    print(f"[>>>] Starting new trade cycle for account {bot.account_pk}")
+    # This will create a new segment (if needed) and a new trade record.
+    # The reconcile function will then pick it up and open the new positions.
+    _get_or_create_segment_and_trade(bot)
 
 
 def close_all_positions(bot):

@@ -97,28 +97,9 @@ def _check_trade_status_on_pnl(bot, position_id, halved_balance, pnl):
 
     # 4. If a status change occurred, trigger the background DB update
     if new_status:
-        deferToThread(_update_db_on_trade_event, trade_id, position_id, new_status, pnl)
-
-def _update_db_on_trade_event(trade_id, position_id, new_status, pnl):
-    """
-    Updates the database in a separate thread after a success or liquidation event.
-    """
-    with SessionSync() as s:
-        # Update the specific TradeDetail
-        trade_detail = s.query(TradeDetail).filter_by(position_id=position_id).first()
-        if not trade_detail or trade_detail.status != 'running':
-            return # Already closed, do nothing
-
-        trade_detail.status = new_status
-        trade_detail.closed_at = dt.datetime.now(dt.timezone.utc)
-        print(f"[DB UPDATE] Set TradeDetail for position {position_id} to '{new_status}'")
-
-        # If the parent trade is now successful or fully liquidated, update it
-        parent_trade = s.query(Trades).get(trade_id)
-        if parent_trade and parent_trade.status == 'running':
-            parent_trade.status = new_status # Set to 'successful' or 'liquidated'
-            parent_trade.ending_balance = float(parent_trade.starting_balance) + pnl
-            parent_trade.closed_at = dt.datetime.now(dt.timezone.utc)
-            print(f"[DB UPDATE] Set parent Trade {trade_id} to '{new_status}'")
-
-        s.commit()
+        from .trading import close_position
+        print(f"--> Triggering CLOSE for position {position_id} due to status: {new_status}")
+        # We need the volume to close the position, get it from bot.positions
+        volume_to_close = bot.positions[position_id].get("volume", 0)
+        if volume_to_close > 0:
+            close_position(bot, position_id, volume_to_close)
