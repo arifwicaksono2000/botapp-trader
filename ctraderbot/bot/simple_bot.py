@@ -18,6 +18,7 @@ class SimpleBot:
         self.positions: dict[int, dict] = {}
         self.trade_couple: dict[int, dict] = {}
         self.pnl_timer = None
+        self.is_refreshing_token = False # Add this line
 
         self.current_balance = None # Used to initalize price from boot
 

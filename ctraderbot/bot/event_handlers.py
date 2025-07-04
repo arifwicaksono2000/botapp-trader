@@ -8,7 +8,7 @@ from ctrader_open_api import Protobuf
 from twisted.internet import reactor
 from google.protobuf.json_format import MessageToDict
 from .auth import after_app_auth, after_account_auth
-from .execution import handle_execution
+from .execution import handle_execution, _handle_token_refresh
 from .pnl_event import handle_pnl_event
 from .stop_operation import stop_reactor
 # from .spot_event import handle_spot_event
@@ -41,8 +41,8 @@ def on_message(bot, msg):
         handle_execution(bot, Protobuf.extract(msg))
     elif pt == ProtoOAGetPositionUnrealizedPnLRes().payloadType:
         handle_pnl_event(bot, msg)
-    elif pt == ProtoOAReconcileRes().payloadType:
-        stop_reactor(bot, msg)
+    # elif pt == ProtoOAReconcileRes().payloadType:
+    #     stop_reactor(bot, msg)
     elif pt == ProtoOAAccountLogoutRes().payloadType:
         print("[Info] Logout confirmed by server. Connection will be closed shortly.")
     elif pt == ProtoOAAccountDisconnectEvent().payloadType:
@@ -50,6 +50,14 @@ def on_message(bot, msg):
         on_disconnected("Server sent a disconnect event.")
     elif pt in {ProtoOAOrderErrorEvent().payloadType, ProtoOAErrorRes().payloadType}:
         err = Protobuf.extract(msg)
+        error_code = getattr(err, 'errorCode', '')
+
+        #################
+        # THIS IS STILL BROKEN
+        #################
+        if error_code in ["CH_ACCESS_TOKEN_INVALID", "OA_AUTH_TOKEN_EXPIRED"]:
+            _handle_token_refresh(bot)
+
         print("[✖] Server error:", MessageToDict(err))
         stop_reactor(bot, msg)
 
