@@ -81,3 +81,5 @@ OrderDetails 845486310
 OrderListByPositionId 506788875
 
 ClosePosition 506287535 36000 CLOSE_POS_123
+
+ProtoOAReconcileReq
