@@ -4,6 +4,7 @@ from .trading import request_unrealized_pnl
 from .event_handlers import register_callbacks
 from twisted.internet import reactor
 import datetime
+from .trading import _get_or_create_segment_and_trade
 
 class SimpleBot:
     def __init__(self, client: Client, access_token: str, account_pk: int, account_id: int, symbol_id: int, hold: int):
@@ -65,8 +66,7 @@ class SimpleBot:
         print(f"🎉 [SCHEDULER] Running specific task at {datetime.datetime.now()}! 🎉")
         
         # --- PLACE YOUR 19:00-SPECIFIC LOGIC HERE ---
-        # For example, you could call a function to close all open positions:
-        # close_all_positions(self)
+        _get_or_create_segment_and_trade(bot)
         
         # Reschedule this task to run again tomorrow (24 hours * 3600 seconds)
         # This creates a recurring daily task.

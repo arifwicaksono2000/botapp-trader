@@ -61,14 +61,14 @@ def _get_or_create_segment_and_trade(bot_instance):
             new_pivot = create_new_segment(
                 subaccount_id=bot_instance.account_pk, 
                 milestone_id=milestone.id,
-                total_balance=bot_instance.current_balance, 
+                total_balance=milestone.starting_balance, 
                 pair="EURUSD", 
                 is_pivot=True
             )
             create_trade(
                 segment_id=new_pivot.id, 
                 milestone_id=milestone.id,
-                current_balance=bot_instance.current_balance
+                current_balance=milestone.starting_balance
             )
         else:
             # --- 1. Check the Time Condition ---
@@ -379,4 +379,19 @@ def request_unrealized_pnl(bot):
     bot.client.send(request)
 
 def reconcile(bot):
+    """
+    Sends a reconcile request and returns a Deferred that will fire with the response.
+    """
+    d = Deferred()
+
+    # Temporarily override the message handler to capture the specific response
+    def custom_reconcile_handler(_, msg):
+        if msg.payloadType == ProtoOAReconcileRes().payloadType:
+            # When we get the response, fire the Deferred with the message payload
+            d.callback(Protobuf.extract(msg))
+            # IMPORTANT: Restore the original message handler immediately
+            bot.client.setMessageReceivedCallback(lambda _, m: on_message(bot, m))
+
+    bot.client.setMessageReceivedCallback(custom_reconcile_handler)
     bot.client.send(ProtoOAReconcileReq(ctidTraderAccountId=bot.account_id))
+    return d

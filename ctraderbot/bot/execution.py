@@ -5,8 +5,6 @@ from twisted.internet.threads import deferToThread
 from ctrader_open_api.messages.OpenApiMessages_pb2 import *
 from ctrader_open_api.messages.OpenApiCommonMessages_pb2 import *       # noqa: F403,E402
 from ctrader_open_api.messages.OpenApiModelMessages_pb2 import *       # noqa: F403,E402
-# from ..helpers import insert_deal
-# from .trading import close_position, reconcile
 from ..helpers import *
 from twisted.internet import reactor
 from datetime import timezone
@@ -200,16 +198,44 @@ def _handle_closed_position_workflow(bot, closed_pid, exit_price, commission, sw
     # Update the parent Trade row status to successful/liquidated
     update_parent_trade_status(trade_id, final_status)
 
-    # 5. Reconcile to ensure the account is clean before starting a new trade
+    # 5. Reconcile to verify closure and clean up memory
     from .trading import reconcile
-    reconcile(bot)
-    
-    # 6. Trigger the creation of a new trade cycle
-    print(f"[>>>] Starting new trade cycle for account {bot.account_pk}")
-    # This will create a new segment (if needed) and a new trade record.
-    # The reconcile function will then pick it up and open the new positions.
-    _get_or_create_segment_and_trade(bot)
+    d = reconcile(bot)
+    d.addCallback(_after_reconcile_cleanup, bot=bot, closed_trade_id=trade_id, closed_trade_info=trade_info)
+    d.addErrback(lambda f: print(f"[!!!] Reconcile after trade close failed: {f}"))
 
+def _after_reconcile_cleanup(reconcile_res, bot, closed_trade_id, closed_trade_info):
+    """
+    Final step after reconciliation: verify closure, clean memory, and start new trade.
+    """
+    server_position_ids = {pos.positionId for pos in reconcile_res.position}
+    
+    # 1. Verify that the positions from the just-closed trade are truly gone
+    long_pid = closed_trade_info.get("long_position_id")
+    short_pid = closed_trade_info.get("short_position_id")
+
+    if long_pid in server_position_ids or short_pid in server_position_ids:
+        print(f"[!!!] CRITICAL WARNING: Positions for trade {closed_trade_id} still exist on server after close command!")
+        from .trading import close_position
+
+        # Fallback: Find the lingering position(s) and attempt to close them again.
+        for pos in reconcile_res.position:
+            # Check if this position is one of the ones that should have been closed.
+            if pos.positionId == long_pid or pos.positionId == short_pid:
+                print(f"--> Sending fallback CLOSE command for lingering position {pos.positionId}")
+                volume_to_close = pos.tradeData.volume
+                close_position(bot, pos.positionId, volume_to_close)
+
+        return # Stop the process to prevent creating overlapping trades
+
+    # 2. Clean up memory by removing the completed trade from the bot's state
+    if closed_trade_id in bot.trade_couple:
+        del bot.trade_couple[closed_trade_id]
+        print(f"[INFO] Removed completed trade {closed_trade_id} from memory.")
+
+    # 3. Trigger the creation of a new trade cycle
+    print(f"[>>>] Account is clean. Starting new trade cycle for account {bot.account_pk}")
+    _get_or_create_segment_and_trade(bot)
 
 def close_all_positions(bot):
     """Close every open position we know about."""
