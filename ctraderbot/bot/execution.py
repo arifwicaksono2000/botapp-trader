@@ -6,15 +6,10 @@ from ctrader_open_api.messages.OpenApiMessages_pb2 import *
 from ctrader_open_api.messages.OpenApiCommonMessages_pb2 import *       # noqa: F403,E402
 from ctrader_open_api.messages.OpenApiModelMessages_pb2 import *       # noqa: F403,E402
 from ..helpers import *
-from twisted.internet import reactor
 from datetime import timezone
 from ..database import SessionSync
 from .trading import _get_or_create_segment_and_trade
-import os
-import requests
-import mysql.connector
-from datetime import datetime, timedelta
-from ..settings import CLIENT_ID, CLIENT_SECRET, SYMBOL_ID
+
 
 def handle_execution(bot, ev):
     print("[✓] Execution Event:")
@@ -248,111 +243,3 @@ def close_all_positions(bot):
         if info["status"] == "OPEN":
             from .trading import close_position
             close_position(bot, position_id)
-
-def _handle_token_refresh(bot):
-    """
-    Runs the get_ctrader_refresh.py script to get a new token,
-    then fetches it from the DB and re-authenticates.
-    """
-    print("[INFO] Attempting to refresh access token by running script...")
-    try:
-        # Run the external script to refresh the token
-        process = subprocess.run(
-            ["python", "setup/get_ctrader_refresh.py"],
-            capture_output=True, text=True, check=True, timeout=30
-        )
-        print(f"[INFO] Refresh script output:\n{process.stdout}")
-
-        # After script success, fetch the new token from the database
-        # Note: fetch_access_token is async, so we need to handle it correctly in a thread
-        from asgiref.sync import async_to_sync
-        new_token = async_to_sync(fetch_access_token)()
-        
-        # Update the bot's in-memory token
-        bot.access_token = new_token
-        print("[SUCCESS] New access token fetched and updated in bot's memory.")
-        
-        # Reset the flag and restart the authentication process
-        bot.is_refreshing_token = False
-        on_connected(bot)
-
-    except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as e:
-        print(f"[!!!] FATAL: Token refresh script failed: {e.stderr}")
-        if reactor.running:
-            reactor.stop()
-    except Exception as e:
-        print(f"[!!!] FATAL: An unexpected error occurred during token refresh: {e}")
-        if reactor.running:
-            reactor.stop()
-
-def should_refresh_token(error_code, bot):
-    print(f"[WARN] Invalid/Expired token detected (Code: {error_code}).")
-    
-    # Prevent infinite refresh loops
-    if bot.is_refreshing_token:
-        print("[!!!] FATAL: Already attempting to refresh token. Shutting down to prevent loop.")
-        if reactor.running: reactor.stop()
-        return
-
-    bot.is_refreshing_token = True
-    token_url = "https://openapi.ctrader.com/apps/token"
-    
-    db = None # Initialize db connection to None
-    try:
-        # 1. Fetch the latest refresh token from your database
-        db = mysql.connector.connect(
-            host=os.getenv("DB_HOST"),
-            user=os.getenv("DB_USER"),
-            password=os.getenv("DB_PASS"),
-            database=os.getenv("DB_NAME")
-        )
-        cursor = db.cursor(dictionary=True)
-        cursor.execute("SELECT refresh_token FROM botcore_token WHERE is_used = TRUE ORDER BY created_at DESC LIMIT 1")
-        row = cursor.fetchone()
-
-        if not row:
-            raise RuntimeError("No active refresh token found in the database.")
-
-        refresh_token_val = row["refresh_token"]
-        print(f"🔄 Using refresh token: ...{refresh_token_val[-6:]}")
-
-        # 2. Request new access token
-        resp = requests.post(token_url, data={
-            "grant_type": "refresh_token",
-            "refresh_token": refresh_token_val,
-            "client_id": CLIENT_ID,
-            "client_secret": CLIENT_SECRET
-        }, timeout=15) # Add a timeout for safety
-
-        resp.raise_for_status() # Raises an exception for bad status codes (4xx or 5xx)
-
-        data = resp.json()
-        if data.get("errorCode"):
-            raise RuntimeError(f"cTrader API Error: {data['errorCode']} - {data.get('description')}")
-
-        new_access_token = data["accessToken"]
-        new_refresh_token = data["refreshToken"]
-        expires_at = datetime.now() + timedelta(seconds=data["expires_in"])
-        
-        print("✅ Token refreshed successfully!")
-
-        # 3. Store the new tokens
-        cursor.execute("UPDATE botcore_token SET is_used = FALSE WHERE is_used = TRUE")
-        cursor.execute("""
-            INSERT INTO botcore_token (access_token, refresh_token, is_used, expires_at, created_at, user_id)
-            VALUES (%s, %s, TRUE, %s, %s, 1)
-        """, (new_access_token, new_refresh_token, expires_at, datetime.now()))
-        db.commit()
-        
-        print("📦 New tokens saved to database.")
-        return True # Indicate success
-
-    except Exception as e:
-        print(f"[!!!] HELPER ERROR: Direct token refresh failed: {e}")
-        # Re-raise the exception to be caught by the calling function in event_handlers.py
-        raise e
-    finally:
-        # Ensure the database connection is always closed
-        if db and db.is_connected():
-            cursor.close()
-            db.close()

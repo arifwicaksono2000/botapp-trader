@@ -8,11 +8,13 @@ from ctrader_open_api import Protobuf
 from twisted.internet import reactor
 from google.protobuf.json_format import MessageToDict
 from .auth import after_app_auth, after_account_auth
-from .execution import handle_execution, _handle_token_refresh
+from .execution import handle_execution
+from .token_refresh import handle_token_refresh
 from .pnl_event import handle_pnl_event
 from .stop_operation import stop_reactor
 # from .spot_event import handle_spot_event
 from ..settings import CLIENT_ID, CLIENT_SECRET
+from twisted.internet.threads import deferToThread
 
 def register_callbacks(bot):
     bot.client.setConnectedCallback(lambda _: on_connected(bot))
@@ -52,11 +54,9 @@ def on_message(bot, msg):
         err = Protobuf.extract(msg)
         error_code = getattr(err, 'errorCode', '')
 
-        #################
-        # THIS IS STILL BROKEN
-        #################
         if error_code in ["CH_ACCESS_TOKEN_INVALID", "OA_AUTH_TOKEN_EXPIRED"]:
-            _handle_token_refresh(bot)
+            deferToThread(handle_token_refresh, bot)
+            return
 
         print("[✖] Server error:", MessageToDict(err))
         stop_reactor(bot, msg)

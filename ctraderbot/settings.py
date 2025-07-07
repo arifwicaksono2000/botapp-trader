@@ -14,6 +14,12 @@ load_dotenv(dotenv_path=dotenv_path)
 HOST = EndPoints.PROTOBUF_DEMO_HOST
 PORT = EndPoints.PROTOBUF_PORT
 
+DB_HOST: str | None = os.getenv("DB_HOST")
+DB_USER: str | None = os.getenv("DB_USER")
+DB_PASS: str | None = os.getenv("DB_PASS")
+DB_NAME: str | None = os.getenv("DB_NAME")
+
+
 CLIENT_ID: str | None = os.getenv("CTRADER_CLIENT_ID")
 CLIENT_SECRET: str | None = os.getenv("CTRADER_CLIENT_SECRET")
 ACCOUNT_ID: int = int(os.getenv("CTRADER_ACCOUNT", 0))
