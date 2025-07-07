@@ -8,7 +8,7 @@ from ctrader_open_api.messages.OpenApiModelMessages_pb2 import *       # noqa: F
 from ..helpers import *
 from datetime import timezone
 from ..database import SessionSync
-from .trading import _get_or_create_segment_and_trade
+# from .trading import _get_or_create_segment_and_trade
 
 
 def handle_execution(bot, ev):
@@ -235,7 +235,12 @@ def _after_reconcile_cleanup(reconcile_res, bot, closed_trade_id, closed_trade_i
 
     # 3. Trigger the creation of a new trade cycle
     print(f"[>>>] Account is clean. Starting new trade cycle for account {bot.account_pk}")
-    _get_or_create_segment_and_trade(bot)
+
+    # Send a request to get the latest trader info, which includes the balance
+    bot.client.send(ProtoOATraderReq(ctidTraderAccountId=bot.account_id))
+
+    # Moved to trader response event handler
+    # _get_or_create_segment_and_trade(bot)
 
 def close_all_positions(bot):
     """Close every open position we know about."""

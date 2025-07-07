@@ -265,3 +265,16 @@ def update_parent_trade_status(trade_id: int, final_status: str):
             parent_trade.closed_at = dt.datetime.now(dt.timezone.utc)
             print(f"[DB UPDATE] Set parent Trade {trade_id} to '{final_status}'.")
             s.commit()
+
+def update_account_balance_in_db(account_pk: int, new_balance: float):
+    """
+    Updates the balance for a specific subaccount in the database.
+    """
+    with SessionSync() as s:
+        subaccount = s.query(Subaccount).filter_by(id=account_pk).first()
+        if subaccount:
+            print(f"[DB UPDATE] Syncing account {account_pk} balance to: {new_balance:.2f}")
+            subaccount.balance = new_balance
+            s.commit()
+        else:
+            print(f"[DB WARN] Could not find subaccount with pk {account_pk} to update balance.")

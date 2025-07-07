@@ -12,6 +12,8 @@ from .execution import handle_execution
 from .token_refresh import handle_token_refresh
 from .pnl_event import handle_pnl_event
 from .stop_operation import stop_reactor
+from ..helpers import update_account_balance_in_db
+from .trading import _get_or_create_segment_and_trade
 # from .spot_event import handle_spot_event
 from ..settings import CLIENT_ID, CLIENT_SECRET
 from twisted.internet.threads import deferToThread
@@ -43,13 +45,27 @@ def on_message(bot, msg):
         handle_execution(bot, Protobuf.extract(msg))
     elif pt == ProtoOAGetPositionUnrealizedPnLRes().payloadType:
         handle_pnl_event(bot, msg)
-    # elif pt == ProtoOAReconcileRes().payloadType:
-    #     stop_reactor(bot, msg)
     elif pt == ProtoOAAccountLogoutRes().payloadType:
         print("[Info] Logout confirmed by server. Connection will be closed shortly.")
     elif pt == ProtoOAAccountDisconnectEvent().payloadType:
         print("[Info] Account disconnected by server.")
         on_disconnected("Server sent a disconnect event.")
+    elif pt == ProtoOATraderRes().payloadType:
+        trader_res = Protobuf.extract(msg)
+        trader_info = trader_res.trader
+        
+        # Calculate the real balance
+        real_balance = trader_info.balance / (10 ** trader_info.moneyDigits)
+        
+        # Update the bot's in-memory balance
+        bot.current_balance = real_balance
+        
+        # Defer the DB update and the new trade start to a background thread
+        deferToThread(update_account_balance_in_db, bot.account_pk, real_balance)
+        
+        print(f"[>>>] Balance synced. Starting new trade cycle.")
+        _get_or_create_segment_and_trade(bot)
+        return # Important to stop further processing
     elif pt in {ProtoOAOrderErrorEvent().payloadType, ProtoOAErrorRes().payloadType}:
         err = Protobuf.extract(msg)
         error_code = getattr(err, 'errorCode', '')
