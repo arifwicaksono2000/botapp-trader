@@ -2,3 +2,4 @@
 trenv
 __pycache__/
 **/__pycache__/
+stash/

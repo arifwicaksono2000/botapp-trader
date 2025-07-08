@@ -72,3 +72,28 @@ class SimpleBot:
         # Reschedule this task to run again tomorrow (24 hours * 3600 seconds)
         # This creates a recurring daily task.
         reactor.callLater(24 * 3600, self.run_daily_task_at_19)
+    
+    def emergency_stop_all_trades(self):
+        """
+        Iterates through all known running positions and sends a close command for each.
+        """
+        print("[!!!] EMERGENCY STOP INITIATED! Attempting to close all active positions.")
+        
+        # Make a copy of the items to avoid issues with modifying the dict while iterating
+        positions_to_close = list(self.positions.items())
+        
+        if not positions_to_close:
+            print("[INFO] No active positions found in memory to close.")
+            return
+
+        closed_count = 0
+        for position_id, pos_data in positions_to_close:
+            if pos_data.get("status") == "OPEN":
+                from .trading import close_position
+                volume_to_close = pos_data.get("volume", 0)
+                if volume_to_close > 0:
+                    print(f"--> Sending EMERGENCY CLOSE for position {position_id}")
+                    close_position(self, position_id, volume_to_close)
+                    closed_count += 1
+        
+        print(f"[INFO] Emergency close commands sent for {closed_count} positions.")
