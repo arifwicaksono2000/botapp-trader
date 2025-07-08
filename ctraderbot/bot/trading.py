@@ -230,18 +230,18 @@ def _on_reconcile_response(reconcile_res, bot):
                 })
                 
                 # We can check the age of the first detail to determine the trade's age.
-                first_detail = details_for_this_trade[0]
-                opened_at_aware = first_detail.opened_at.replace(tzinfo=timezone.utc)
-                time_since_open = datetime.now(timezone.utc) - opened_at_aware
+                # first_detail = details_for_this_trade[0]
+                # opened_at_aware = first_detail.opened_at.replace(tzinfo=timezone.utc)
+                # time_since_open = datetime.now(timezone.utc) - opened_at_aware
                 
-                if time_since_open.total_seconds() >= bot.hold:
-                    print(f"[Action] Trade {trade.id} has exceeded hold time ({bot.hold}s). Closing positions.")
-                    for detail in details_for_this_trade:
-                        position_obj = server_positions.get(detail.position_id)
-                        if position_obj:
-                            close_position(bot, detail.position_id, position_obj.tradeData.volume)
-                else:
-                    print(f"--- Trade {trade.id} is within hold time. No action taken. ---")
+                # if time_since_open.total_seconds() >= bot.hold:
+                #     print(f"[Action] Trade {trade.id} has exceeded hold time ({bot.hold}s). Closing positions.")
+                #     for detail in details_for_this_trade:
+                #         position_obj = server_positions.get(detail.position_id)
+                #         if position_obj:
+                #             close_position(bot, detail.position_id, position_obj.tradeData.volume)
+                # else:
+                #     print(f"--- Trade {trade.id} is within hold time. No action taken. ---")
             
             # Case 2: The trade is missing one or both positions.
             else:

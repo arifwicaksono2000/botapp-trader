@@ -27,3 +27,5 @@ SYMBOL_ID: int = int(os.getenv("CTRADER_SYMBOL_ID", 1))  # EUR/USD default
 
 MYSQL_URL: str | None = os.getenv("MYSQL_URL")
 MYSQL_SYNC_URL = MYSQL_URL.replace("mysql+aiomysql", "mysql+pymysql")
+
+BOT_API_TOKEN: str | None = os.getenv("BOT_API_TOKEN")

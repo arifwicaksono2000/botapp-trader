@@ -7,13 +7,12 @@ import datetime
 from .trading import _get_or_create_segment_and_trade
 
 class SimpleBot:
-    def __init__(self, client: Client, access_token: str, account_pk: int, account_id: int, symbol_id: int, hold: int):
+    def __init__(self, client: Client, access_token: str, account_pk: int, account_id: int, symbol_id: int):
         self.client = client
         self.access_token = access_token
         self.account_pk = account_pk 
         self.account_id = account_id
         self.symbol_id = symbol_id
-        self.hold = hold
         self.is_shutting_down = False
         self.positions: dict[int, dict] = {}
         self.trade_couple: dict[int, dict] = {}
@@ -67,7 +66,7 @@ class SimpleBot:
         print(f"🎉 [SCHEDULER] Running specific task at {datetime.datetime.now()}! 🎉")
         
         # --- PLACE YOUR 19:00-SPECIFIC LOGIC HERE ---
-        _get_or_create_segment_and_trade(bot)
+        _get_or_create_segment_and_trade(self)
         
         # Reschedule this task to run again tomorrow (24 hours * 3600 seconds)
         # This creates a recurring daily task.
