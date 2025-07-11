@@ -23,4 +23,4 @@ def after_account_auth(bot):
     # Create initial Segment here!
     
     send_market_order(bot)
-    bot.schedule_pnl_updates()
+    bot.start_schedules()
