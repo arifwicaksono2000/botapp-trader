@@ -26,55 +26,55 @@ bot_instance: SimpleBot = None
 app = FastAPI(title="cTrader Bot Control API")
 
 ####### WEBSOCKET SYNTAX START ##########
-class ConnectionManager:
-    def __init__(self):
-        self.active_connections: list[WebSocket] = []
+# class ConnectionManager:
+#     def __init__(self):
+#         self.active_connections: list[WebSocket] = []
 
-    async def connect(self, websocket: WebSocket):
-        try:
-            await websocket.accept()
-            self.active_connections.append(websocket)
-        except Exception as e:
-            print(f"[!] WebSocket accept failed: {e}")
-
-
-    async def disconnect(self, websocket: WebSocket):
-        self.active_connections.remove(websocket)
-
-    async def broadcast(self, data: dict):
-        to_remove = []
-        for connection in self.active_connections:
-            try:
-                await connection.send_json(data)
-            except RuntimeError:
-                # Client already disconnected
-                to_remove.append(connection)
-            except Exception as e:
-                print(f"[!] Unexpected WebSocket error: {e}")
-                to_remove.append(connection)
-        for conn in to_remove:
-            # In some versions of FastAPI/Starlette, this can error if already disconnected
-            # So we just remove it from our list.
-            if conn in self.active_connections:
-               self.active_connections.remove(conn)
+#     async def connect(self, websocket: WebSocket):
+#         try:
+#             await websocket.accept()
+#             self.active_connections.append(websocket)
+#         except Exception as e:
+#             print(f"[!] WebSocket accept failed: {e}")
 
 
-manager = ConnectionManager()
+#     async def disconnect(self, websocket: WebSocket):
+#         self.active_connections.remove(websocket)
 
-@app.websocket("/ws/positions")
-async def positions_stream(websocket: WebSocket):
-    await manager.connect(websocket)
-    try:
-        while True:
-            # Keep the connection alive
-            await websocket.receive_text()
-    except WebSocketDisconnect:
-        await manager.disconnect(websocket)
+#     async def broadcast(self, data: dict):
+#         to_remove = []
+#         for connection in self.active_connections:
+#             try:
+#                 await connection.send_json(data)
+#             except RuntimeError:
+#                 # Client already disconnected
+#                 to_remove.append(connection)
+#             except Exception as e:
+#                 print(f"[!] Unexpected WebSocket error: {e}")
+#                 to_remove.append(connection)
+#         for conn in to_remove:
+#             # In some versions of FastAPI/Starlette, this can error if already disconnected
+#             # So we just remove it from our list.
+#             if conn in self.active_connections:
+#                self.active_connections.remove(conn)
 
-@app.post("/broadcast")
-async def broadcast_endpoint(data: dict):
-    await manager.broadcast(data)
-    return {"status": "sent", "data": data}
+
+# manager = ConnectionManager()
+
+# @app.websocket("/ws/positions")
+# async def positions_stream(websocket: WebSocket):
+#     await manager.connect(websocket)
+#     try:
+#         while True:
+#             # Keep the connection alive
+#             await websocket.receive_text()
+#     except WebSocketDisconnect:
+#         await manager.disconnect(websocket)
+
+# @app.post("/broadcast")
+# async def broadcast_endpoint(data: dict):
+#     await manager.broadcast(data)
+#     return {"status": "sent", "data": data}
 
 ####### WEBSOCKET SYNTAX END ##########
 
