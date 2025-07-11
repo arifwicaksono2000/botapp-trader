@@ -43,9 +43,9 @@ def _get_or_create_segment_and_trade(bot_instance):
     by creating new segments or trades if conditions are met.
     It no longer opens positions directly.
     """
-    with SessionSync() as s:
-        pivot_segment = fetch_running_pivot_segment(bot_instance.account_pk)
-        if pivot_segment is None:
+    pivot_segment = fetch_running_pivot_segment(bot_instance.account_pk)
+    if pivot_segment is None:
+        with SessionSync() as s:
             constant = s.query(Constant).where(
                 Constant.variable == 'initial_level',
                 Constant.is_active == True
@@ -55,77 +55,77 @@ def _get_or_create_segment_and_trade(bot_instance):
             milestone = s.query(Milestone).where(
                 Milestone.id <= int(constant.value)
             ).first()
-            
-            if not milestone: raise RuntimeError("No milestone found for current balance.")
-            
-            new_pivot = create_new_segment(
-                subaccount_id=bot_instance.account_pk, 
-                milestone_id=milestone.id,
-                total_balance=milestone.starting_balance, 
-                pair="EURUSD", 
-                is_pivot=True
-            )
-            create_trade(
-                segment_id=new_pivot.id, 
-                milestone_id=milestone.id,
-                current_balance=milestone.starting_balance
-            )
-        else:
-            # --- 1. Check the Time Condition ---
         
-            # Get the pivot segment's opening date (e.g., 2025-06-20 10:00:00)
-            # pivot_open_date = pivot_segment.opened_at
-            pivot_open_date_aware = pivot_segment.opened_at.replace(tzinfo=timezone.utc)
-            
-            # Calculate the target date: the day after it opened
-            target_datetime_utc = (pivot_open_date_aware + timedelta(days=1)).replace(
-                hour=17, minute=0, second=0, microsecond=0
-            )
-            
-            # Get the current time in UTC
-            # now_utc = datetime.now(timezone.utc)
-            
-            time_condition_met = datetime.now(timezone.utc) >= target_datetime_utc
+        if not milestone: raise RuntimeError("No milestone found for current balance.")
+        
+        new_pivot = create_new_segment(
+            subaccount_id=bot_instance.account_pk, 
+            milestone_id=milestone.id,
+            total_balance=milestone.starting_balance, 
+            pair="EURUSD", 
+            is_pivot=True
+        )
+        create_trade(
+            segment_id=new_pivot.id, 
+            milestone_id=milestone.id,
+            current_balance=milestone.starting_balance
+        )
+    else:
+        # --- 1. Check the Time Condition ---
+    
+        # Get the pivot segment's opening date (e.g., 2025-06-20 10:00:00)
+        # pivot_open_date = pivot_segment.opened_at
+        pivot_open_date_aware = pivot_segment.opened_at.replace(tzinfo=timezone.utc)
+        
+        # Calculate the target date: the day after it opened
+        target_datetime_utc = (pivot_open_date_aware + timedelta(days=1)).replace(
+            hour=17, minute=0, second=0, microsecond=0
+        )
+        
+        # Get the current time in UTC
+        # now_utc = datetime.now(timezone.utc)
+        
+        time_condition_met = datetime.now(timezone.utc) >= target_datetime_utc
 
-            # --- 2. Check the Balance Condition ---
-            
-            with SessionSync() as s:
-                initial_level = s.query(Constant).where(
-                    Constant.variable == 'initial_level',
-                    Constant.is_active == True,
-                ).first()
+        # --- 2. Check the Balance Condition ---
+        
+        with SessionSync() as s:
+            initial_level = s.query(Constant).where(
+                Constant.variable == 'initial_level',
+                Constant.is_active == True,
+            ).first()
 
-                # Find the milestone that corresponds to the current balance
-                milestone = s.query(Milestone).where(
-                    Milestone.id == initial_level.value
-                ).first()
-                    
-                milestone_balance = float(milestone.starting_balance)
+            # Find the milestone that corresponds to the current balance
+            milestone = s.query(Milestone).where(
+                Milestone.id == initial_level.value
+            ).first()
                 
-                balance_condition_met = pivot_segment.total_balance >= (2 * milestone_balance)
+            milestone_balance = float(milestone.starting_balance)
             
-            if time_condition_met and balance_condition_met:
-                print("Extending Segments. Creating a new one.")
-                given_balance = pivot_segment.total_balance - milestone_balance
+            balance_condition_met = pivot_segment.total_balance >= (2 * milestone_balance)
+        
+        if time_condition_met and balance_condition_met:
+            print("Extending Segments. Creating a new one.")
+            given_balance = pivot_segment.total_balance - milestone_balance
 
-                new_segment = create_new_segment(
-                    subaccount_id=bot_instance.account_pk,
-                    milestone_id=milestone.id,
-                    total_balance=given_balance,
-                    pair="EURUSD"  # Assuming default
-                )
+            new_segment = create_new_segment(
+                subaccount_id=bot_instance.account_pk,
+                milestone_id=milestone.id,
+                total_balance=given_balance,
+                pair="EURUSD"  # Assuming default
+            )
 
-                # Create the new trade record
-                new_trade = create_trade(
-                    segment_id=new_segment.id,
-                    milestone_id=milestone.id,
-                    current_balance=given_balance
-                )
+            # Create the new trade record
+            new_trade = create_trade(
+                segment_id=new_segment.id,
+                milestone_id=milestone.id,
+                current_balance=given_balance
+            )
 
-                # Immediately open the positions for the new trade we just created.
-                # We run this in a thread to avoid blocking the main loop.
-                print(f"[Action] Triggering position opening for new Trade ID: {new_trade.id}")
-                deferToThread(_open_positions_for_trade, new_trade, bot_instance)
+            # Immediately open the positions for the new trade we just created.
+            # We run this in a thread to avoid blocking the main loop.
+            print(f"[Action] Triggering position opening for new Trade ID: {new_trade.id}")
+            deferToThread(_open_positions_for_trade, new_trade, bot_instance)
 
     return True # Signal that the DB state is ready
 
@@ -321,6 +321,7 @@ def _open_positions_for_trade(trade: Trades, bot_instance):
             orderType=ProtoOAOrderType.MARKET, tradeSide=ProtoOATradeSide.Value("BUY"),
             volume=lot_size, clientOrderId=f"trade_{trade.id}_long_open"
         ))
+        
         # Open SHORT position
         bot_instance.client.send(ProtoOANewOrderReq(
             ctidTraderAccountId=bot_instance.account_id, symbolId=bot_instance.symbol_id,
