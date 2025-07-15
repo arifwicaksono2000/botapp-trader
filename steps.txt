@@ -2,7 +2,7 @@
 
 ## RUN APP
 
-1. python -m ctraderbot.cli --hold 10
+1. python main.py
 
 ## CREATE VIRTUAL MACHINE
 

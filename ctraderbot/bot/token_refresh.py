@@ -3,10 +3,10 @@ import requests
 import mysql.connector
 from datetime import datetime, timedelta
 from ..settings import *
-from .event_handlers import on_connected
 from twisted.internet import reactor
 
 def handle_token_refresh(bot):
+    from .event_handlers import on_connected
     
     # Prevent infinite refresh loops
     if bot.is_refreshing_token:

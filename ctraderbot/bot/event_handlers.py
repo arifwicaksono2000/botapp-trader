@@ -13,7 +13,6 @@ from .token_refresh import handle_token_refresh
 from .pnl_event import handle_pnl_event
 from .stop_operation import stop_reactor
 from ..helpers import update_account_balance_in_db
-from .trading import _get_or_create_segment_and_trade
 # from .spot_event import handle_spot_event
 from ..settings import CLIENT_ID, CLIENT_SECRET
 from twisted.internet.threads import deferToThread
@@ -34,6 +33,9 @@ def on_disconnected(reason):
         reactor.stop()
 
 def on_message(bot, msg):
+    
+    from .trading import _get_or_create_segment_and_trade
+
     pt = msg.payloadType
     print(f"[debug] Incoming payloadType = {pt}")
 
