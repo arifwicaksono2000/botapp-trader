@@ -111,7 +111,7 @@ def handle_execution(bot, ev):
                     segment_id=segment_id,
                     position_id=pid,
                     side=ProtoOATradeSide.Name(side),
-                    lot_size=current_volume / 100.0,
+                    lot_size=current_volume / (100_000.0 * 100), # Convert to standard lots
                     entry_price=entry_price
                 ).addErrback(lambda f: print(f"Failed to create TradeDetail for {pid}: {f}"))
 

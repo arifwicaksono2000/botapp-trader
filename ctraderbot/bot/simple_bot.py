@@ -33,7 +33,8 @@ class SimpleBot:
         self.schedule_pnl_updates()
 
         # Start the new specific task for 19:00
-        self.schedule_daily_task_at_19()
+        self.schedule_periodic_task()
+        # self.schedule_daily_task_at_19()
     
     def schedule_pnl_updates(self):
         """Schedules the bot to request PnL updates every 1 seconds."""
@@ -96,3 +97,27 @@ class SimpleBot:
                     closed_count += 1
         
         print(f"[INFO] Emergency close commands sent for {closed_count} positions.")
+
+    ##### DEVELOPMENT METHODS ONLY #####
+
+    def schedule_periodic_task(self):
+        """Schedules a task to run for the first time after 2 minutes."""
+        from twisted.internet import reactor
+        print("[SCHEDULER] Starting periodic task. First run in 2 minutes.")
+        # Schedule the first execution after 120 seconds.
+        reactor.callLater(120, self.run_periodic_task)
+
+    def run_periodic_task(self):
+        """
+        This is the actual task that will run every 2 minutes.
+        It reschedules itself to run again.
+        """
+        from twisted.internet import reactor
+        print(f"🎉 [SCHEDULER] Running periodic task at {datetime.datetime.now()}! 🎉")
+        
+        # --- YOUR TASK LOGIC GOES HERE ---
+        _get_or_create_segment_and_trade(self)
+        
+        # --- Reschedule this same task to run again in 2 minutes (120 seconds) ---
+        print("[SCHEDULER] Rescheduling task for 2 minutes from now.")
+        reactor.callLater(120, self.run_periodic_task)

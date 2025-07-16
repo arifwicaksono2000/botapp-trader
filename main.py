@@ -5,12 +5,11 @@ Main entry point to run the cTrader bot and the FastAPI control server together.
 import os
 import uvicorn
 import threading
-from fastapi import FastAPI, Header, HTTPException
+from fastapi import FastAPI, Header, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi import FastAPI
 
 # --- Only import what's needed for the reactor setup and FastAPI app ---
 from ctraderbot.bridge import setup_asyncio_reactor
-
 
 # --- Main Application Setup ---
 
@@ -21,6 +20,58 @@ bot_instance: "SimpleBot" = None
 # 1. Set up the FastAPI app
 app = FastAPI(title="cTrader Bot Control API")
 
+####### WEBSOCKET SYNTAX START ##########
+class ConnectionManager:
+    def __init__(self):
+        self.active_connections: list[WebSocket] = []
+
+    async def connect(self, websocket: WebSocket):
+        try:
+            await websocket.accept()
+            self.active_connections.append(websocket)
+        except Exception as e:
+            print(f"[!] WebSocket accept failed: {e}")
+
+
+    async def disconnect(self, websocket: WebSocket):
+        self.active_connections.remove(websocket)
+
+    async def broadcast(self, data: dict):
+        to_remove = []
+        for connection in self.active_connections:
+            try:
+                await connection.send_json(data)
+            except RuntimeError:
+                # Client already disconnected
+                to_remove.append(connection)
+            except Exception as e:
+                print(f"[!] Unexpected WebSocket error: {e}")
+                to_remove.append(connection)
+        for conn in to_remove:
+            # In some versions of FastAPI/Starlette, this can error if already disconnected
+            # So we just remove it from our list.
+            if conn in self.active_connections:
+               self.active_connections.remove(conn)
+
+
+manager = ConnectionManager()
+
+@app.websocket("/ws/positions")
+async def positions_stream(websocket: WebSocket):
+    await manager.connect(websocket)
+    try:
+        while True:
+            # Keep the connection alive
+            await websocket.receive_text()
+    except WebSocketDisconnect:
+        await manager.disconnect(websocket)
+
+@app.post("/broadcast")
+async def broadcast_endpoint(data: dict):
+    await manager.broadcast(data)
+    return {"status": "sent", "data": data}
+
+####### WEBSOCKET SYNTAX END ##########
 
 @app.post("/emergency-stop")
 async def emergency_stop(authorization: str = Header(None)):
@@ -51,7 +102,7 @@ def main():
     """
     Initializes and starts both the cTrader bot and the API server.
     """
-    # global bot_instance
+    global bot_instance
 
     # --- Step 1: Install the reactor FIRST. ---
     loop = setup_asyncio_reactor()
