@@ -53,7 +53,7 @@ def _get_or_create_segment_and_trade(bot_instance):
 
             # Create a new pivot segment and its first trade
             milestone = s.query(Milestone).where(
-                Milestone.id <= int(constant.value)
+                Milestone.id == int(constant.value)
             ).first()
         
         if not milestone: raise RuntimeError("No milestone found for current balance.")
@@ -217,7 +217,7 @@ def _on_reconcile_response(reconcile_res, bot):
             # --- THIS IS THE NEW, CORRECTED LOGIC ---
             # Case 1: The trade is healthy (both positions are open).
             if has_long and has_short:
-                print(f"--- Trade {trade.id} is healthy. Checking hold time... ---")
+                print(f"--- Trade {trade.id} is healthy")
 
                 long_pos_id = next((d.position_id for d in details_for_this_trade if d.position_type == 'long'), None)
                 short_pos_id = next((d.position_id for d in details_for_this_trade if d.position_type == 'short'), None)
