@@ -11,6 +11,7 @@ from ..database import SessionSync
 from .event_handlers import on_message
 from ctrader_open_api import Protobuf
 from datetime import datetime, timedelta, timezone
+from decimal import Decimal
 
 def send_market_order(bot):
     """
@@ -72,20 +73,19 @@ def _get_or_create_segment_and_trade(bot_instance):
         )
     else:
         # --- 1. Check the Time Condition ---
-    
-        # Get the pivot segment's opening date (e.g., 2025-06-20 10:00:00)
-        # pivot_open_date = pivot_segment.opened_at
-        pivot_open_date_aware = pivot_segment.opened_at.replace(tzinfo=timezone.utc)
-        
-        # Calculate the target date: the day after it opened
-        target_datetime_utc = (pivot_open_date_aware + timedelta(days=1)).replace(
-            hour=17, minute=0, second=0, microsecond=0
-        )
-        
-        # Get the current time in UTC
-        # now_utc = datetime.now(timezone.utc)
-        
-        time_condition_met = datetime.now(timezone.utc) >= target_datetime_utc
+        print(f"Detected Pivot Segment ID: {pivot_segment.uuid}")
+
+        ### Every 19:00, we check if the segment should be extended.
+        # pivot_open_date_aware = pivot_segment.opened_at.replace(tzinfo=timezone.utc)
+        # target_datetime_utc = (pivot_open_date_aware + timedelta(days=1)).replace(
+        #     hour=17, minute=0, second=0, microsecond=0
+        # )   
+        # time_condition_met = datetime.now(timezone.utc) >= target_datetime_utc
+
+        ### Every 2 minutes, we check if the segment should be extended.
+        # pivot_open_date_aware = pivot_segment.opened_at.replace(tzinfo=timezone.utc)
+        # time_since_open = datetime.now(timezone.utc) - pivot_open_date_aware
+        # time_condition_met = time_since_open.total_seconds() >= 120
 
         # --- 2. Check the Balance Condition ---
         
@@ -104,9 +104,19 @@ def _get_or_create_segment_and_trade(bot_instance):
             
             balance_condition_met = pivot_segment.total_balance >= (2 * milestone_balance)
         
-        if time_condition_met and balance_condition_met:
+        if balance_condition_met:
             print("Extending Segments. Creating a new one.")
-            given_balance = pivot_segment.total_balance - milestone_balance
+            given_balance = pivot_segment.total_balance - Decimal(str(milestone_balance))
+            curr_pivot_balance = Decimal(str(milestone_balance))
+
+            # --- START: Add this block to update the database ---
+            print(f"[DB UPDATE] Updating pivot segment {pivot_segment.id} balance to: {curr_pivot_balance}")
+            pivot_segment.total_balance = curr_pivot_balance
+            with SessionSync() as s:
+                # Use merge() to update the existing detached object in the new session
+                s.merge(pivot_segment)
+                s.commit()
+            # --- END: Block to update the database ---
 
             new_segment = create_new_segment(
                 subaccount_id=bot_instance.account_pk,
@@ -219,6 +229,30 @@ def _on_reconcile_response(reconcile_res, bot):
             if has_long and has_short:
                 print(f"--- Trade {trade.id} is healthy")
 
+                # Find the position objects from the server's response
+                for detail in details_for_this_trade:
+                    if detail.position_id in server_positions:
+                        pos = server_positions[detail.position_id]
+
+                        segment = s.query(Segments).get(detail.segment_id)
+                        if not segment:
+                            print(f"[ERROR] Could not find segment for detail {detail.id}. Cannot load position.")
+                            continue
+
+                        # Load the position data into the bot's memory
+                        bot.positions[pos.positionId] = {
+                            "symbolId": pos.tradeData.symbolId,
+                            "volume": pos.tradeData.volume,
+                            "entry_price": pos.price,
+                            "used_margin": pos.usedMargin,
+                            "swap": pos.swap,
+                            "timestamp": datetime.now(timezone.utc).isoformat(),
+                            "status": "OPEN",
+                            "tradeSide": pos.tradeData.tradeSide,
+                            "total_balance": segment.total_balance # Assuming pivot context
+                        }
+                        print(f"[RECONCILE] Loaded existing position {pos.positionId} into memory.")
+
                 long_pos_id = next((d.position_id for d in details_for_this_trade if d.position_type == 'long'), None)
                 short_pos_id = next((d.position_id for d in details_for_this_trade if d.position_type == 'short'), None)
 
@@ -297,37 +331,40 @@ def _open_positions_for_trade(trade: Trades, bot_instance):
     """
     if not trade:
         return
-    
-    bot_instance.trade_couple[trade.id] = {
-        "trade_id": trade.id,
-        "long_position_id": None, # This will be set at execution response
-        "long_status": None,
-        "short_position_id": None, # This will be set at execution response
-        "short_status": None,
-    }
 
     with SessionSync() as s:
         milestone = s.query(Milestone).get(trade.current_level_id)
         if not milestone:
             print(f"[ERROR] Cannot find milestone for Trade {trade.id}. Skipping.")
             return
-        
-        lot_size = int(float(milestone.lot_size) * 100 * 100000)
-        print(f"--- Opening positions for new Trade ID: {trade.id} with lot size {lot_size} ---")
+    
+    ending_balance = milestone.ending_balance
+    lot_size = int(float(milestone.lot_size) * 100 * 100000)
 
-        # Open LONG position
-        bot_instance.client.send(ProtoOANewOrderReq(
-            ctidTraderAccountId=bot_instance.account_id, symbolId=bot_instance.symbol_id,
-            orderType=ProtoOAOrderType.MARKET, tradeSide=ProtoOATradeSide.Value("BUY"),
-            volume=lot_size, clientOrderId=f"trade_{trade.id}_long_open"
-        ))
-        
-        # Open SHORT position
-        bot_instance.client.send(ProtoOANewOrderReq(
-            ctidTraderAccountId=bot_instance.account_id, symbolId=bot_instance.symbol_id,
-            orderType=ProtoOAOrderType.MARKET, tradeSide=ProtoOATradeSide.Value("SELL"),
-            volume=lot_size, clientOrderId=f"trade_{trade.id}_short_open"
-        ))
+    bot_instance.trade_couple[trade.id] = {
+        "trade_id": trade.id,
+        "ending_balance": ending_balance,
+        "long_position_id": None, # This will be set at execution response
+        "long_status": None,
+        "short_position_id": None, # This will be set at execution response
+        "short_status": None,
+    }
+
+    print(f"--- Opening positions for new Trade ID: {trade.id} with lot size {lot_size} ---")
+
+    # Open LONG position
+    bot_instance.client.send(ProtoOANewOrderReq(
+        ctidTraderAccountId=bot_instance.account_id, symbolId=bot_instance.symbol_id,
+        orderType=ProtoOAOrderType.MARKET, tradeSide=ProtoOATradeSide.Value("BUY"),
+        volume=lot_size, clientOrderId=f"trade_{trade.id}_long_open"
+    ))
+    
+    # Open SHORT position
+    bot_instance.client.send(ProtoOANewOrderReq(
+        ctidTraderAccountId=bot_instance.account_id, symbolId=bot_instance.symbol_id,
+        orderType=ProtoOAOrderType.MARKET, tradeSide=ProtoOATradeSide.Value("SELL"),
+        volume=lot_size, clientOrderId=f"trade_{trade.id}_short_open"
+    ))
 
 def close_position(bot, position_id, volume_to_close):
     if position_id is None:

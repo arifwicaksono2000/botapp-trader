@@ -102,7 +102,7 @@ def handle_execution(bot, ev):
                     segment_id = trade.segment_id
 
                     segment = s.query(Segments).get(segment_id)
-                    bot.positions[pid]["total_balance"] = segment.total_balance
+                    bot.positions[pid]["total_balance"] = segment.total_balance / 2
 
                 # Create the TradeDetail record with the correct IDs
                 deferToThread(

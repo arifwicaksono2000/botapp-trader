@@ -30,7 +30,8 @@ def handle_pnl_event(bot, msg):
             # display_lot = pos_data["volume"] / 100_000.0 # Standard lots
 
             current_balance_float = float(bot.positions[position_id]["total_balance"])
-            halved_balance_float = current_balance_float / 2
+            halved_balance_float = current_balance_float
+            # halved_balance_float = current_balance_float / 2
             
             update_payload = {
                 "positionId":    position_id,
