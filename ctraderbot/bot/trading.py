@@ -33,10 +33,21 @@ def _on_balance_fetched(balance, bot):
     print(f"[Info] Fetched current account balance: {balance}")
     bot.current_balance = balance  # Set the attribute here
 
-    # Now that the bot object has the balance, we can run the segment/trade logic
-    d = deferToThread(_get_or_create_segment_and_trade, bot)
-    d.addCallback(lambda _: _reconcile_positions(bot))
-    d.addErrback(lambda failure: print(f"[DB ERROR] Segment management failed: {failure}"))
+    # --- START: This is the corrected startup logic ---
+
+    # First, check the segment/trade state and create if necessary.
+    # The function now returns the trade that should be active.
+    active_trade = _get_or_create_segment_and_trade(bot)
+
+    # If a new trade was just created, open its positions.
+    # Otherwise, reconcile the state of existing trades.
+    if active_trade and not bot.trade_couple.get(active_trade.id):
+         print(f"[STARTUP] A new trade (ID: {active_trade.id}) was created. Opening initial positions.")
+         deferToThread(_open_positions_for_trade, active_trade, bot)
+    else:
+        print("[STARTUP] Existing trades found. Proceeding with full reconciliation.")
+        _reconcile_positions(bot)
+    # --- END: Corrected startup logic ---
 
 def _get_or_create_segment_and_trade(bot_instance):
     """
@@ -66,11 +77,14 @@ def _get_or_create_segment_and_trade(bot_instance):
             pair="EURUSD", 
             is_pivot=True
         )
-        create_trade(
+
+        new_trade = create_trade(
             segment_id=new_pivot.id, 
             milestone_id=milestone.id,
             current_balance=milestone.starting_balance
         )
+
+        return new_trade
     else:
         # --- 1. Check the Time Condition ---
         print(f"Detected Pivot Segment ID: {pivot_segment.uuid}")
@@ -132,12 +146,14 @@ def _get_or_create_segment_and_trade(bot_instance):
                 current_balance=given_balance
             )
 
+            return new_trade # Return the new trade object
+
             # Immediately open the positions for the new trade we just created.
             # We run this in a thread to avoid blocking the main loop.
-            print(f"[Action] Triggering position opening for new Trade ID: {new_trade.id}")
-            deferToThread(_open_positions_for_trade, new_trade, bot_instance)
+            # print(f"[Action] Triggering position opening for new Trade ID: {new_trade.id}")
+            # deferToThread(_open_positions_for_trade, new_trade, bot_instance)
 
-    return True # Signal that the DB state is ready
+    return None # Signal that the DB state is ready
 
 def _reconcile_positions(bot_instance):
     """
@@ -354,9 +370,9 @@ def _update_status_on_close(position_id: int):
 
         # 2. Update TradeDetail status
         if trade_detail.position_type == 'long':
-            trade_detail.status = 'successful'
+            trade_detail.status = 'closed'
         elif trade_detail.position_type == 'short':
-            trade_detail.status = 'liquidated'
+            trade_detail.status = 'closed'
 
         print(f"[DB UPDATE] Updated TradeDetail {trade_detail.id} for Pos {position_id} to status '{trade_detail.status}'")
 
@@ -364,8 +380,8 @@ def _update_status_on_close(position_id: int):
         parent_trade_id = trade_detail.trade_id
         parent_trade = s.query(Trades).get(parent_trade_id)
         if parent_trade:
-            parent_trade.status = 'successful'
-            print(f"[DB UPDATE] Updated parent Trade {parent_trade.id} to status 'successful'")
+            parent_trade.status = 'closed'
+            print(f"[DB UPDATE] Updated parent Trade {parent_trade.id} to status 'closed'")
 
         s.commit()
 

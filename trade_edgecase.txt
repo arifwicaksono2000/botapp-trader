@@ -1,0 +1,50 @@
+TRADE EDGE CASE
+
+long db exist
+short db exist
+long server exist
+short server exist
+ACTION: add bot.positions and bot.trade_couple
+STATUS: PASS
+
+long db missing
+short db missing
+long server missing
+short server missing
+ACTION: Theoretically couldn’t happen, open new trade
+STATUS: PASS
+
+long db exist
+short db missing
+long server exist
+short server exist
+ACTION: Close both position in server, mark both long and short in db as “closed”, then create a new trade record and open both new position, then add bot.positions and bot.trade_couple
+STATUS: PASS
+
+long db missing
+short db exist
+long server exist
+short server exist
+ACTION: Close both position in server, mark both long and short in db as “closed”, then create a new trade record and open both new position, then add bot.positions and bot.trade_couple
+STATUS: PASS
+
+long db exist
+short db exist
+long server missing
+short server exist
+ACTION: Close short position in server, mark both long and short as “closed” in db, then create a new trade record and open both new position, then add bot.positions and bot.trade_couple
+STATUS: PASS
+
+long db exist
+short db exist
+long server exist
+short server missing
+ACTION: Close long position in server, mark both long and short as “closed” in db, then create a new trade record and open both new position, then add bot.positions and bot.trade_couple
+STATUS: PASS
+
+long db exist
+short db exist
+long server missing
+short server missing
+ACTION: Mark both long and short as “closed” in db, then create a new trade record and open both new position, then add bot.positions and bot.trade_couple
+STATUS: PASS

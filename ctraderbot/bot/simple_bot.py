@@ -4,7 +4,9 @@ from .trading import request_unrealized_pnl
 from .event_handlers import register_callbacks
 from twisted.internet import reactor
 import datetime
-from .trading import _get_or_create_segment_and_trade
+from .trading import _get_or_create_segment_and_trade, _open_positions_for_trade
+from twisted.internet.threads import deferToThread
+
 
 class SimpleBot:
     def __init__(self, client: Client, access_token: str, account_pk: int, account_id: int, symbol_id: int):
@@ -115,8 +117,13 @@ class SimpleBot:
         from twisted.internet import reactor
         print(f"🎉 [SCHEDULER] Running periodic task at {datetime.datetime.now()}! 🎉")
         
-        # --- YOUR TASK LOGIC GOES HERE ---
-        _get_or_create_segment_and_trade(self)
+        # 1. Ask the function to do one specific thing: check and maybe create a trade.
+        new_trade = _get_or_create_segment_and_trade(self)
+
+        # 2. Only act if something new was actually created.
+        if new_trade:
+            # 3. Perform the specific action needed: open positions for this new trade.
+            deferToThread(_open_positions_for_trade, new_trade, self)
         
         # --- Reschedule this same task to run again in 2 minutes (120 seconds) ---
         print("[SCHEDULER] Rescheduling task for 2 minutes from now.")
