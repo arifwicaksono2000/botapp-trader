@@ -166,164 +166,121 @@ def _reconcile_positions(bot_instance):
 
 def _on_reconcile_response(reconcile_res, bot):
     """
-    Callback executed after receiving the server's state.
-    Contains the core logic for comparing DB state vs. Server state.
+    Contains the core logic for comparing DB state vs. Server state
+    based on the user's defined rules.
     """
-    # 1. Get the state from the cTrader Server
     server_positions = {pos.positionId: pos for pos in reconcile_res.position}
-    server_position_ids = server_positions.keys()
-    print(f"[Reconcile] Server State: Found {len(server_positions)} open position(s).")
+    server_position_ids = set(server_positions.keys())
+    print(f"[Reconcile] Server State: Found {len(server_positions)} open position(s). IDs: {server_position_ids}")
 
     with SessionSync() as s:
-        # 2. Get the state from our local Database
-        db_running_details = s.query(TradeDetail).filter(TradeDetail.status == 'running').all()
-        db_position_ids = {detail.position_id for detail in db_running_details}
-        print(f"[Reconcile] Database State: Found {len(db_position_ids)} 'running' position(s).")
+        running_trades = s.query(Trades).filter(Trades.status == 'running').all()
+        print(f"[Reconcile] DB State: Found {len(running_trades)} 'running' trade(s).")
 
-        # 3. ACTION: Close "zombie" positions (exist on server, not in DB)
-        positions_to_close = server_position_ids - db_position_ids
-        if positions_to_close:
-            print(f"[Action] Found {len(positions_to_close)} zombie position(s) to close.")
-            for pos_id in positions_to_close:
-                # We need the full position object to get the volume for closing.
+        # Get all position IDs from the DB that are supposed to be running
+        db_details = s.query(TradeDetail).filter(TradeDetail.status == 'running').all()
+        db_position_ids = {detail.position_id for detail in db_details}
+
+        # --- Handle Zombie Positions (exist on server, not in our DB logic) ---
+        zombie_ids = server_position_ids - db_position_ids
+        if zombie_ids:
+            print(f"[Action] Found {len(zombie_ids)} zombie position(s) to close: {zombie_ids}")
+            for pos_id in zombie_ids:
                 position_obj = server_positions[pos_id]
                 close_position(bot, pos_id, position_obj.tradeData.volume)
-        else:
-            print("[Reconcile] No zombie positions found on server.")
 
-        # 4. ACTION: Open positions for new trades (exist in DB, not on server)
-        running_trades = s.query(Trades).filter(Trades.status == 'running').all()
-        print(f"[Reconcile] Checking status of {len(running_trades)} running trade(s) in DB.")
-
+        # --- Process each running trade from our database ---
         for trade in running_trades:
-
-            milestone = s.query(Milestone).get(trade.current_level_id)
-            if not milestone:
-                print(f"[ERROR] Cannot find milestone for Trade {trade.id}. Skipping.")
-                continue
-            lot_size = int(float(milestone.lot_size) * 100 * 100000)
-            ending_balance = milestone.ending_balance
-
-            trade_id = trade.id
-            if trade not in bot.trade_couple:
-                bot.trade_couple[trade_id] = {}
-
-            bot.trade_couple[trade_id].update({
-                "trade_id": trade_id,
-                "ending_balance": ending_balance,
-                "long_position_id": None,
-                "long_status": None,
-                "short_position_id": None,
-                "short_status": None,
-            })
-        
-            details_for_this_trade = s.query(TradeDetail).filter_by(trade_id=trade.id, status='running').all()
+            details = s.query(TradeDetail).filter_by(trade_id=trade.id).all()
             
-            has_long = any(d.position_type == 'long' and d.position_id in server_position_ids for d in details_for_this_trade)
-            has_short = any(d.position_type == 'short' and d.position_id in server_position_ids for d in details_for_this_trade)
+            # Determine the state for the current trade
+            long_detail = next((d for d in details if d.position_type == 'long'), None)
+            short_detail = next((d for d in details if d.position_type == 'short'), None)
 
-            # Find the specific long and short position IDs from the details
-          
-            # --- THIS IS THE NEW, CORRECTED LOGIC ---
-            # Case 1: The trade is healthy (both positions are open).
-            if has_long and has_short:
-                print(f"--- Trade {trade.id} is healthy")
+            db_has_long = long_detail is not None
+            db_has_short = short_detail is not None
+            
+            server_has_long = long_detail.position_id in server_position_ids if db_has_long else False
+            server_has_short = short_detail.position_id in server_position_ids if db_has_short else False
 
-                # Find the position objects from the server's response
-                for detail in details_for_this_trade:
-                    if detail.position_id in server_positions:
-                        pos = server_positions[detail.position_id]
+            print(f"--- Checking Trade {trade.id}: DB(L:{db_has_long}, S:{db_has_short}) | Server(L:{server_has_long}, S:{server_has_short}) ---")
 
-                        segment = s.query(Segments).get(detail.segment_id)
-                        if not segment:
-                            print(f"[ERROR] Could not find segment for detail {detail.id}. Cannot load position.")
-                            continue
-
-                        # Load the position data into the bot's memory
-                        bot.positions[pos.positionId] = {
-                            "symbolId": pos.tradeData.symbolId,
-                            "volume": pos.tradeData.volume,
-                            "entry_price": pos.price,
-                            "used_margin": pos.usedMargin,
-                            "swap": pos.swap,
-                            "timestamp": datetime.now(timezone.utc).isoformat(),
-                            "status": "OPEN",
-                            "tradeSide": pos.tradeData.tradeSide,
-                            "total_balance": segment.total_balance # Assuming pivot context
-                        }
-                        print(f"[RECONCILE] Loaded existing position {pos.positionId} into memory.")
-
-                long_pos_id = next((d.position_id for d in details_for_this_trade if d.position_type == 'long'), None)
-                short_pos_id = next((d.position_id for d in details_for_this_trade if d.position_type == 'short'), None)
-
-                bot.trade_couple[trade_id].update({
-                    "long_position_id": long_pos_id,
+            # CASE 1: Healthy state. Everything exists.
+            if db_has_long and db_has_short and server_has_long and server_has_short:
+                print(f"[OK] Trade {trade.id} is healthy. Loading into memory.")
+                # Load positions into memory so PnL updates work
+                for detail in [long_detail, short_detail]:
+                    pos = server_positions[detail.position_id]
+                    segment = s.query(Segments).get(detail.segment_id)
+                    bot.positions[pos.positionId] = {
+                        "symbolId": pos.tradeData.symbolId, 
+                        "volume": pos.tradeData.volume,
+                        "entry_price": pos.price, 
+                        "used_margin": pos.usedMargin, 
+                        "swap": pos.swap,
+                        "timestamp": datetime.now(timezone.utc).isoformat(), 
+                        "status": "OPEN",
+                        "tradeSide": pos.tradeData.tradeSide, 
+                        "total_balance": segment.total_balance
+                    }
+                # Load trade couple into memory
+                milestone = s.query(Milestone).get(trade.current_level_id)
+                bot.trade_couple[trade.id] = {
+                    "trade_id": trade.id, 
+                    "ending_balance": milestone.ending_balance,
+                    "long_position_id": long_detail.position_id, 
                     "long_status": "running",
-                    "short_position_id": short_pos_id,
-                    "short_status": "running",
-                })
-                
-                # We can check the age of the first detail to determine the trade's age.
-                # first_detail = details_for_this_trade[0]
-                # opened_at_aware = first_detail.opened_at.replace(tzinfo=timezone.utc)
-                # time_since_open = datetime.now(timezone.utc) - opened_at_aware
-                
-                # if time_since_open.total_seconds() >= bot.hold:
-                #     print(f"[Action] Trade {trade.id} has exceeded hold time ({bot.hold}s). Closing positions.")
-                #     for detail in details_for_this_trade:
-                #         position_obj = server_positions.get(detail.position_id)
-                #         if position_obj:
-                #             close_position(bot, detail.position_id, position_obj.tradeData.volume)
-                # else:
-                #     print(f"--- Trade {trade.id} is within hold time. No action taken. ---")
-            
-            # Case 2: The trade is missing one or both positions.
+                    "short_position_id": short_detail.position_id, 
+                    "short_status": "running"
+                }
+                continue # Move to the next trade
+
+            # ALL OTHER CASES: Any mismatch requires a full reset for this trade.
+            # This covers all the other scenarios you described.
             else:
-                print(f"--- Trade {trade.id} is missing positions (Long: {has_long}, Short: {has_short}). Taking action. ---")
+                print(f"[MISMATCH] Trade {trade.id} is in a broken state. Resetting.")
+                _reset_and_recreate_trade(bot, trade, server_positions, s)
 
-                # Open only the missing LONG position
-                if not has_long:
-                    short_pos_id = next((d.position_id for d in details_for_this_trade if d.position_type == 'short'), None)
+def _reset_and_recreate_trade(bot, old_trade, server_positions, db_session):
+    """
+    Helper function to clean up a broken trade and start a new one.
+    1. Closes any lingering server positions for the trade.
+    2. Marks the old trade and its details as 'closed' in the DB.
+    3. Creates a new trade record for the same segment.
+    4. Opens new positions for the new trade.
+    """
+    print(f"--> Resetting Trade ID: {old_trade.id}")
+    
+    # 1. Close any lingering server positions
+    old_details = db_session.query(TradeDetail).filter_by(trade_id=old_trade.id).all()
+    for detail in old_details:
+        if detail.position_id in server_positions:
+            pos_to_close = server_positions[detail.position_id]
+            print(f"--> Closing lingering server position: {pos_to_close.positionId}")
+            close_position(bot, pos_to_close.positionId, pos_to_close.tradeData.volume)
+        # Mark the detail as closed
+        detail.status = 'closed'
+        detail.closed_at = datetime.now(timezone.utc)
 
-                    bot.trade_couple[trade_id].update({
-                        "long_position_id": None,
-                        "long_status": "closed",
-                        "short_position_id": short_pos_id,
-                        "short_status": "running",
-                    })
-
-                    print(f"[Action] Opening missing LONG position for Trade {trade.id}")
-
-                    bot.client.send(ProtoOANewOrderReq(
-                        ctidTraderAccountId=bot.account_id, symbolId=bot.symbol_id, orderType=ProtoOAOrderType.MARKET,
-                        tradeSide=ProtoOATradeSide.Value("BUY"), volume=lot_size, clientOrderId=f"trade_{trade.id}_long_open"
-                        # tradeSide=ProtoOATradeSide.Value("BUY"), volume=lot_size, clientOrderId=f"trade_{trade.id}_long_reopen"
-                    ))
-                # Open only the missing SHORT position
-                if not has_short:
-                    long_pos_id = next((d.position_id for d in details_for_this_trade if d.position_type == 'long'), None)
-
-                    bot.trade_couple[trade_id].update({
-                        "long_position_id": long_pos_id,
-                        "long_status": "running",
-                        "short_position_id": None,
-                        "short_status": "closed",
-                    })
-
-                    print(f"[Action] Opening missing SHORT position for Trade {trade.id}")
-
-                    bot.client.send(ProtoOANewOrderReq(
-                        ctidTraderAccountId=bot.account_id, symbolId=bot.symbol_id, orderType=ProtoOAOrderType.MARKET,
-                        tradeSide=ProtoOATradeSide.Value("SELL"), volume=lot_size, clientOrderId=f"trade_{trade.id}_short_open"
-                        # tradeSide=ProtoOATradeSide.Value("SELL"), volume=lot_size, clientOrderId=f"trade_{trade.id}_short_reopen"
-                    ))
-
-        # Mark stale details as closed if their position ID is not on the server
-        for detail in db_running_details:
-            if detail.position_id not in server_position_ids:
-                print(f"[DB Cleanup] Marking stale TradeDetail for position {detail.position_id} as closed.")
-                detail.status = 'closed'
-        s.commit()
+    # 2. Mark the parent trade as closed
+    old_trade.status = 'closed'
+    old_trade.closed_at = datetime.now(timezone.utc)
+    
+    # 3. Create a new trade for the same segment
+    segment = db_session.query(Segments).get(old_trade.segment_id)
+    new_trade = create_trade(
+        segment_id=segment.id,
+        milestone_id=old_trade.current_level_id,
+        current_balance=segment.total_balance
+    )
+    print(f"--> Created new Trade ID: {new_trade.id} to replace the old one.")
+    
+    # Commit all DB changes (closing old, creating new)
+    db_session.commit()
+    
+    # 4. Open fresh positions for the new trade
+    # We defer this to a thread to avoid blocking the main loop
+    deferToThread(_open_positions_for_trade, new_trade, bot)
 
 def _open_positions_for_trade(trade: Trades, bot_instance):
     """
