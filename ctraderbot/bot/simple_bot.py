@@ -35,8 +35,8 @@ class SimpleBot:
         self.schedule_pnl_updates()
 
         # Start the new specific task for 19:00
-        self.schedule_periodic_task()
-        # self.schedule_daily_task_at_19()
+        # self.schedule_periodic_task()
+        self.schedule_daily_task_at_19()
     
     def schedule_pnl_updates(self):
         """Schedules the bot to request PnL updates every 1 seconds."""
@@ -66,10 +66,16 @@ class SimpleBot:
         This is the actual task that will run at 19:00.
         It reschedules itself to run again the next day.
         """
-        print(f"🎉 [SCHEDULER] Running specific task at {datetime.datetime.now()}! 🎉")
+        from twisted.internet import reactor
+        print(f"🎉 [SCHEDULER] Running periodic task at {datetime.datetime.now()}! 🎉")
         
-        # --- PLACE YOUR 19:00-SPECIFIC LOGIC HERE ---
-        _get_or_create_segment_and_trade(self)
+        # 1. Ask the function to do one specific thing: check and maybe create a trade.
+        new_trade = _get_or_create_segment_and_trade(self)
+
+        # 2. Only act if something new was actually created.
+        if new_trade:
+            # 3. Perform the specific action needed: open positions for this new trade.
+            deferToThread(_open_positions_for_trade, new_trade, self)
         
         # Reschedule this task to run again tomorrow (24 hours * 3600 seconds)
         # This creates a recurring daily task.
