@@ -71,7 +71,16 @@ def handle_token_refresh(bot):
         
         # Reset the flag and restart the authentication process
         bot.is_refreshing_token = False
-        on_connected(bot)
+        # --- START OF THE FIX ---
+        # The original operation that failed was account authorization.
+        # Instead of starting a new connection, we directly re-attempt
+        # that specific step with the new token.
+        print("[INFO] Resuming account authorization with the new token...")
+        from .auth import after_app_auth
+        after_app_auth(bot) # This function sends the correct AccountAuthReq
+        # --- END OF THE FIX ---
+
+        # on_connected(bot)
 
     except Exception as e:
         print(f"[!!!] FATAL: An unexpected error occurred during token refresh: {e}")

@@ -4,6 +4,14 @@
 
 1. python main.py
 
+## RUN APP VIA DOCKER 
+
+1. docker-compose up --build
+
+## STOP DOCKER
+
+1. docker-compose down
+
 ## CREATE VIRTUAL MACHINE
 
 1. python3 -m venv trenv ==> mac
