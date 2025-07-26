@@ -196,7 +196,7 @@ def _handle_closed_position_workflow(bot, closed_pid, exit_price, commission, sw
     print(f"[>>>] Both positions for trade {trade_id} are {other_pos_status}. Finalizing trade cycle.")
     
     # Update the parent Trade row status to successful/liquidated
-    update_parent_trade_status(trade_id, final_status)
+    update_parent_trade_status(trade_id, final_status, trade_info["resulted_balance"])
 
     # 5. Reconcile to verify closure and clean up memory
     from .trading import reconcile
@@ -228,10 +228,20 @@ def _after_reconcile_cleanup(reconcile_res, bot, closed_trade_id, closed_trade_i
 
         return # Stop the process to prevent creating overlapping trades
 
-    # 2. Clean up memory by removing the completed trade from the bot's state
+    # 2. Clean up memory, Both positions are deleted immediately here
     if closed_trade_id in bot.trade_couple:
         del bot.trade_couple[closed_trade_id]
         print(f"[INFO] Removed completed trade {closed_trade_id} from memory.")
+    
+    # ---- START: NEW DELETION LOGIC ----
+    if long_pid and long_pid in bot.positions:
+        del bot.positions[long_pid]
+        print(f"[INFO] Removed closed position {long_pid} from bot.positions.")
+
+    if short_pid and short_pid in bot.positions:
+        del bot.positions[short_pid]
+        print(f"[INFO] Removed closed position {short_pid} from bot.positions.")
+    # ---- END: NEW DELETION LOGIC ----
 
     # 3. Trigger the creation of a new trade cycle
     print(f"[>>>] Account is clean. Starting new trade cycle for account {bot.account_pk}")

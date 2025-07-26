@@ -89,12 +89,14 @@ def _check_trade_status_on_pnl(bot, position_id, halved_balance, pnl):
         print(f"[!!!] LIQUIDATION DETECTED for position {position_id} in trade {trade_id}")
         new_status = 'liquidated'
         trade_info[f"{position_side}_status"] = new_status
+        trade_info["resulted_balance"] = 0
 
     # 3. Check for Success in memory
     elif halved_balance + pnl > ending_balance:
         print(f"[$$$] SUCCESS DETECTED for position {position_id} in trade {trade_id}")
         new_status = 'successful'
         trade_info[f"{position_side}_status"] = new_status
+        trade_info["resulted_balance"] = halved_balance + pnl
 
     # 4. If a status change occurred, trigger the background DB update
     if new_status:

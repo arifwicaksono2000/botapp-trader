@@ -9,6 +9,8 @@ from .database import Session, SessionSync
 from .models import * # Imports all the new model names
 from datetime import timezone
 import datetime as dt
+from decimal import Decimal
+from sqlalchemy import and_
 
 async def fetch_access_token() -> str:
     """Return the latest *active* access‑token from DB or raise."""
@@ -256,15 +258,116 @@ def update_trade_detail_on_close(position_id: int, exit_price: float, commission
         print(f"[DB UPDATE] Set TradeDetail for Pos {position_id} to '{final_status}'.")
         s.commit()
 
-def update_parent_trade_status(trade_id: int, final_status: str):
-    """Updates the parent Trade row to a final status."""
+def update_parent_trade_status(trade_id: int, final_status: str, resulted_balance: float):
+    """
+    Updates the parent Trade row to a final status, calculates the final
+    balance, determines the achieved level, and updates the parent Segment.
+    """
     with SessionSync() as s:
+        # 1. Get the parent trade
         parent_trade = s.query(Trades).get(trade_id)
-        if parent_trade and parent_trade.status == 'running':
-            parent_trade.status = final_status
-            parent_trade.closed_at = dt.datetime.now(dt.timezone.utc)
-            print(f"[DB UPDATE] Set parent Trade {trade_id} to '{final_status}'.")
-            s.commit()
+        if not parent_trade or parent_trade.status != 'running':
+            return # Exit if trade is not found or already closed
+
+        # ... (PnL and ending_balance calculation logic remains the same)
+        # sibling_details = s.query(TradeDetail).filter_by(trade_id=parent_trade.id).all()
+        # if not sibling_details:
+        #     print(f"[DB WARN] No trade details found for Trade {trade_id}. Cannot calculate ending balance.")
+        #     return
+
+        # total_pnl = Decimal('0.0')
+        # for detail in sibling_details:
+        #     if detail.exit_price is None or detail.entry_price is None:
+        #         continue
+
+        #     lot_size_in_units = detail.lot_size * 100000
+        #     price_difference = detail.exit_price - detail.entry_price
+
+        #     if detail.position_type == 'short':
+        #         price_difference = -price_difference
+
+        #     position_pnl = price_difference * lot_size_in_units
+        #     total_pnl += position_pnl
+
+        # 4. Update the parent trade object
+        parent_trade.status = final_status
+        parent_trade.closed_at = dt.datetime.now(dt.timezone.utc)
+        parent_trade.ending_balance = resulted_balance
+        # parent_trade.ending_balance = parent_trade.starting_balance + total_pnl
+
+        # 5. Update achieved_level_id based on the outcome
+        if final_status == 'successful':
+            # ---- START: MODIFIED MILESTONE LOGIC ----
+            # Find the new milestone based on where the ending_balance falls
+            new_milestone = s.query(Milestone).filter(
+                and_(
+                    Milestone.starting_balance <= parent_trade.ending_balance,
+                    Milestone.ending_balance > parent_trade.ending_balance
+                )
+            ).first()
+
+            if new_milestone:
+                parent_trade.achieved_level_id = new_milestone.id
+                print(f"[DB UPDATE] Trade successful. New achieved level is {new_milestone.id}.")
+            else:
+                # If no milestone fits, it might be the last one or an edge case.
+                # Default to the current level.
+                parent_trade.achieved_level_id = parent_trade.current_level_id
+                print("[DB UPDATE] Trade successful but no new milestone found. Reached end of levels.")
+            # ---- END: MODIFIED MILESTONE LOGIC ----
+
+        else: # 'liquidated' or other failure status
+            parent_trade.achieved_level_id = parent_trade.current_level_id
+
+        print(f"[DB UPDATE] Set parent Trade {trade_id} to '{final_status}' with ending balance: {parent_trade.ending_balance:.2f}")
+
+        # ---- START: NEW SEGMENT UPDATE LOGIC ----
+
+        # 6. Get the parent segment to update its status
+        parent_segment = s.query(Segments).get(parent_trade.segment_id)
+        if not parent_segment:
+            return
+
+        # 7. Handle Segment Liquidation
+        if final_status == 'liquidated':
+            parent_segment.status = 'liquidated'
+            parent_segment.closed_at = dt.datetime.now(dt.timezone.utc)
+            print(f"[DB UPDATE] Segment {parent_segment.id} has been liquidated.")
+
+            # If the liquidated segment was the pivot, find and assign a new one
+            if parent_segment.is_pivot:
+                parent_segment.is_pivot = False
+                print(f"[DB UPDATE] Pivot Segment {parent_segment.id} liquidated. Finding new pivot...")
+
+                # Find the next running segment, ordered by creation time
+                next_pivot_segment = s.query(Segments).filter(
+                    Segments.subaccount_id == parent_segment.subaccount_id,
+                    Segments.status == 'running'
+                ).order_by(Segments.opened_at.asc()).first()
+
+                if next_pivot_segment:
+                    next_pivot_segment.is_pivot = True
+                    print(f"[DB UPDATE] Segment {next_pivot_segment.id} is the new pivot.")
+                else:
+                    print("[DB WARN] No other running segments available to become the new pivot.")
+
+        # 8. Handle Segment Success (Reaching Ending Level)
+        # Only pivot segment can have unlimited level, because it always going to give
+        else: # Check for success only if not liquidated
+            ending_level_row = s.query(Constant).filter_by(variable='ending_level', is_active=True).first()
+            if ending_level_row:
+                ending_level_value = Decimal(ending_level_row.value)
+                # Check if the segment's new total balance meets the ending level
+                if parent_trade.ending_balance >= ending_level_value:
+                    parent_segment.status = 'successful'
+                    parent_segment.closed_at = dt.datetime.now(dt.timezone.utc)
+                    print(f"[DB UPDATE] Segment {parent_segment.id} has reached the ending level and is now successful.")
+            else:
+                print("[DB WARN] 'ending_level' constant not found. Cannot check for segment success.")
+
+        # ---- END: NEW SEGMENT UPDATE LOGIC ----
+        
+        s.commit()
 
 def update_account_balance_in_db(account_pk: int, new_balance: float):
     """

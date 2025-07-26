@@ -244,6 +244,7 @@ def _on_reconcile_response(reconcile_res, bot):
                 bot.trade_couple[trade.id] = {
                     "trade_id": trade.id, 
                     "ending_balance": milestone.ending_balance,
+                    "resulted_balance": None,
                     "long_position_id": long_detail.position_id, 
                     "long_status": "running",
                     "short_position_id": short_detail.position_id, 
@@ -317,6 +318,7 @@ def _open_positions_for_trade(trade: Trades, bot_instance):
     bot_instance.trade_couple[trade.id] = {
         "trade_id": trade.id,
         "ending_balance": ending_balance,
+        "resulted_balance": None,
         "long_position_id": None, # This will be set at execution response
         "long_status": None,
         "short_position_id": None, # This will be set at execution response
