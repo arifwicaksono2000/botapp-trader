@@ -76,6 +76,17 @@ def on_message(bot, msg):
             deferToThread(handle_token_refresh, bot)
             return
 
+        if error_code in ["MARKET_CLOSED"]:
+            from .trading import send_market_order
+
+            # Correct delay for half an hour is x seconds
+            delay_seconds = 1800 
+            print(f"[SCHEDULER] Market is closed. Retrying in {delay_seconds / 60:.0f} minutes.")
+            
+            # Pass the function and its argument separately
+            reactor.callLater(delay_seconds, send_market_order, bot)
+            return
+
         print("[✖] Server error:", MessageToDict(err))
         stop_reactor(bot, msg)
 
