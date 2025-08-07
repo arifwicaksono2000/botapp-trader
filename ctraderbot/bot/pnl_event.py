@@ -7,6 +7,7 @@ from ctrader_open_api.messages.OpenApiModelMessages_pb2 import *       # noqa: F
 from twisted.internet.threads import deferToThread
 from ..database import SessionSync
 from ..models import Trades, TradeDetail
+from ..helpers import create_event_log # Import the new helper
 
 def handle_pnl_event(bot, msg):
     pnl_res = Protobuf.extract(msg)
@@ -80,6 +81,8 @@ def _check_trade_status_on_pnl(bot, position_id, halved_balance, pnl):
     if not trade_id or trade_info.get(f"{position_side}_status") != "running":
         # Exit if trade not found or the position is not in a 'running' state in memory
         return
+    
+    print(f"[DEBUG] Trade Couple: {trade_info}")
 
     ending_balance = float(trade_info["ending_balance"])
     new_status = None
@@ -90,6 +93,18 @@ def _check_trade_status_on_pnl(bot, position_id, halved_balance, pnl):
         new_status = 'liquidated'
         trade_info[f"{position_side}_status"] = new_status
         trade_info["resulted_balance"] = 0
+        log_details = {
+            "pnl": pnl,
+            "halved_balance": halved_balance,
+            "reason": "Balance plus PnL reached zero or less."
+        }
+        deferToThread(
+            create_event_log,
+            trade_id=trade_id,
+            position_id=position_id,
+            event_type=new_status,
+            details=log_details
+        )
 
     # 3. Check for Success in memory
     elif halved_balance + pnl > ending_balance:
@@ -97,6 +112,19 @@ def _check_trade_status_on_pnl(bot, position_id, halved_balance, pnl):
         new_status = 'successful'
         trade_info[f"{position_side}_status"] = new_status
         trade_info["resulted_balance"] = halved_balance + pnl
+        log_details = {
+            "pnl": pnl,
+            "halved_balance": halved_balance,
+            "ending_balance_target": ending_balance,
+            "reason": "Profit goal reached."
+        }
+        deferToThread(
+            create_event_log,
+            trade_id=trade_id,
+            position_id=position_id,
+            event_type=new_status,
+            details=log_details
+        )
 
     # 4. If a status change occurred, trigger the background DB update
     if new_status:

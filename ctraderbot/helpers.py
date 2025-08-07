@@ -381,3 +381,30 @@ def update_account_balance_in_db(account_pk: int, new_balance: float):
             s.commit()
         else:
             print(f"[DB WARN] Could not find subaccount with pk {account_pk} to update balance.")
+
+# NEW FUNCTION TO LOG EVENTS
+def create_event_log(trade_id: int, position_id: int, event_type: str, details: dict):
+    """
+    Creates a new EventLog entry in the database.
+    """
+    from .models import EventLog, Trades
+    with SessionSync() as s:
+        try:
+            # First, ensure the trade exists
+            trade = s.query(Trades).get(trade_id)
+            if not trade:
+                print(f"[DB ERROR] Could not find Trade with id {trade_id} for event logging.")
+                return
+
+            new_log = EventLog(
+                trade_id=trade_id,
+                position_id=position_id,
+                event_type=event_type,
+                details=details
+            )
+            s.add(new_log)
+            s.commit()
+            print(f"[DB LOG] Successfully logged '{event_type}' event for Trade {trade_id}, Position {position_id}")
+        except Exception as e:
+            print(f"[DB ERROR] Failed to create event log for trade {trade_id}: {e}")
+            s.rollback()
